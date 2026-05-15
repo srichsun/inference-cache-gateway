@@ -1,0 +1,59 @@
+plugins:
+  - rubocop-rails
+  - rubocop-minitest
+
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - "bin/**/*"
+    - "db/**/*"
+    - "config/**/*"
+    - "vendor/**/*"
+    - "node_modules/**/*"
+    - "tmp/**/*"
+    - "Rakefile"
+
+# --- Style ---
+Style/Documentation:
+  Enabled: false
+
+Style/FrozenStringLiteralComment:
+  Enabled: false
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+
+# --- Layout ---
+Layout/LineLength:
+  Max: 120
+
+# --- Metrics ---
+Metrics/AbcSize:
+  Max: 40
+
+Metrics/MethodLength:
+  Max: 35
+
+Metrics/ClassLength:
+  Max: 150
+
+Metrics/BlockLength:
+  Exclude:
+    - "test/**/*"
+    - "config/**/*"
+
+# --- Minitest ---
+Minitest/MultipleAssertions:
+  Max: 5
+
+# --- Naming ---
+Naming/PredicateMethod:
+  Enabled: false
+
+Naming/AccessorMethodName:
+  Enabled: false
