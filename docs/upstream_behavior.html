@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Upstream Rate-API: Observed Behavior — Dane Wu</title>
+<title>Upstream Rate-API：觀測行為 — Dane Wu</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 32px; max-width: 1100px; margin: 0 auto; line-height: 1.7; font-size: 1.05rem; }
@@ -86,145 +86,145 @@
 </head>
 <body>
 
-<a href="index.html#upstream" class="back">&#8592; Back to Home</a>
+<a href="index.html#upstream" class="back">&#8592; 返回主頁</a>
 
 <h1>Upstream Rate-API</h1>
-<p class="subtitle">Observed Behavior &amp; Error Handling</p>
-<p class="author">Findings from two live test runs against the upstream rate API. Run <code>ruby upstream_test.rb [single|bulk]</code> any time the upstream changes to refresh.</p>
+<p class="subtitle">觀測行為與錯誤處理</p>
+<p class="author">對 upstream rate API 進行兩次真實測試的結果。當 upstream 有變動時，執行 <code>ruby upstream_test.rb [single|bulk]</code> 更新資料。</p>
 
 <hr class="divider">
 
 <!-- Test 1 -->
-<h2>Test 1 — Single rate</h2>
-<p class="test-meta">2026-05-02 &nbsp;·&nbsp; 1001 calls &nbsp;·&nbsp; 1 combination per request &nbsp;·&nbsp; Log: <code>single_upstream_test.log</code></p>
+<h2>測試一 — 單一房價查詢</h2>
+<p class="test-meta">2026-05-02 &nbsp;·&nbsp; 1001 次呼叫 &nbsp;·&nbsp; 每次請求 1 種組合 &nbsp;·&nbsp; Log：<code>single_upstream_test.log</code></p>
 <table>
-  <thead><tr><th>#</th><th class="count-col">Count</th><th class="count-col">%</th><th>Pattern</th></tr></thead>
+  <thead><tr><th>#</th><th class="count-col">次數</th><th class="count-col">%</th><th>模式</th></tr></thead>
   <tbody>
-    <tr><td class="num-col">1</td><td class="count-col">631</td><td class="count-col">63.0%</td><td><span class="pattern-ok">&#10003;</span> HTTP 200 — rate as Integer</td></tr>
-    <tr><td class="num-col">2</td><td class="count-col">81</td><td class="count-col">8.1%</td><td><span class="pattern-ok">&#10003;</span> HTTP 200 — rate as String</td></tr>
+    <tr><td class="num-col">1</td><td class="count-col">631</td><td class="count-col">63.0%</td><td><span class="pattern-ok">&#10003;</span> HTTP 200 — rate 為 Integer</td></tr>
+    <tr><td class="num-col">2</td><td class="count-col">81</td><td class="count-col">8.1%</td><td><span class="pattern-ok">&#10003;</span> HTTP 200 — rate 為 String</td></tr>
     <tr><td class="num-col">3</td><td class="count-col">74</td><td class="count-col" style="color:#ef4444;font-weight:600;">7.4%</td><td><span class="pattern-err">&#10007;</span> <span class="status-badge s-500">500</span> &nbsp;<code>{"error":"An unexpected internal error occurred"}</code></td></tr>
-    <tr><td class="num-col">4</td><td class="count-col">73</td><td class="count-col" style="color:#ef4444;font-weight:600;">7.3%</td><td><span class="pattern-warn">&#9888;</span> HTTP 200 — rate field absent from response</td></tr>
+    <tr><td class="num-col">4</td><td class="count-col">73</td><td class="count-col" style="color:#ef4444;font-weight:600;">7.3%</td><td><span class="pattern-warn">&#9888;</span> HTTP 200 — 回應中缺少 rate 欄位</td></tr>
     <tr><td class="num-col">5</td><td class="count-col">71</td><td class="count-col" style="color:#ef4444;font-weight:600;">7.1%</td><td><span class="pattern-err">&#10007;</span> <span class="status-badge s-timeout">TIMEOUT</span></td></tr>
-    <tr><td class="num-col">6</td><td class="count-col">70</td><td class="count-col" style="color:#ef4444;font-weight:600;">7.0%</td><td><span class="pattern-warn">&#9888;</span> HTTP 200 — error body <code>{"message":"Failed to process rates...","status":"error"}</code></td></tr>
+    <tr><td class="num-col">6</td><td class="count-col">70</td><td class="count-col" style="color:#ef4444;font-weight:600;">7.0%</td><td><span class="pattern-warn">&#9888;</span> HTTP 200 — 錯誤 body <code>{"message":"Failed to process rates...","status":"error"}</code></td></tr>
     <tr><td class="num-col">7</td><td class="count-col">1</td><td class="count-col">0.1%</td><td><span class="pattern-err">&#10007;</span> <span class="status-badge s-429">429</span> &nbsp;<code>{"error":"Rate limit exceeded (1000/day)"}</code></td></tr>
   </tbody>
 </table>
-<p style="margin-top:10px;padding:8px 14px;background:#ef444415;border-left:3px solid #ef4444;border-radius:4px;font-size:0.95rem;"><span style="color:#ef4444;font-weight:700;">⚠ Failure rate: 28.8%</span> <span style="color:#94a3b8;">— 288 / 1001 calls failed or returned unusable data. This upstream is highly unreliable.</span></p>
+<p style="margin-top:10px;padding:8px 14px;background:#ef444415;border-left:3px solid #ef4444;border-radius:4px;font-size:0.95rem;"><span style="color:#ef4444;font-weight:700;">⚠ 失敗率：28.8%</span> <span style="color:#94a3b8;">— 1001 次呼叫中有 288 次失敗或回傳無效資料。此 upstream 極不穩定。</span></p>
 
 <hr class="divider">
 
 <!-- Test 2 -->
-<h2>Test 2 — Bulk rates</h2>
-<p class="test-meta">2026-05-02 &nbsp;·&nbsp; 1001 calls &nbsp;·&nbsp; all 36 combinations per request &nbsp;·&nbsp; Log: <code>bulk_upstream_test.log</code></p>
+<h2>測試二 — 批次房價查詢</h2>
+<p class="test-meta">2026-05-02 &nbsp;·&nbsp; 1001 次呼叫 &nbsp;·&nbsp; 每次請求全部 36 種組合 &nbsp;·&nbsp; Log：<code>bulk_upstream_test.log</code></p>
 <table>
-  <thead><tr><th>#</th><th class="count-col">Count</th><th class="count-col">%</th><th>Pattern</th></tr></thead>
+  <thead><tr><th>#</th><th class="count-col">次數</th><th class="count-col">%</th><th>模式</th></tr></thead>
   <tbody>
-    <tr><td class="num-col">1</td><td class="count-col">662</td><td class="count-col">66.1%</td><td><span class="pattern-ok">&#10003;</span> HTTP 200 — all 36 rates as Integer</td></tr>
+    <tr><td class="num-col">1</td><td class="count-col">662</td><td class="count-col">66.1%</td><td><span class="pattern-ok">&#10003;</span> HTTP 200 — 全部 36 個 rate 為 Integer</td></tr>
     <tr><td class="num-col">2</td><td class="count-col">74</td><td class="count-col" style="color:#ef4444;font-weight:600;">7.4%</td><td><span class="pattern-err">&#10007;</span> <span class="status-badge s-timeout">TIMEOUT</span></td></tr>
-    <tr><td class="num-col">3</td><td class="count-col">74</td><td class="count-col" style="color:#ef4444;font-weight:600;">7.4%</td><td><span class="pattern-warn">&#9888;</span> HTTP 200 — all 36 entries rate field absent from response</td></tr>
-    <tr><td class="num-col">4</td><td class="count-col">66</td><td class="count-col">6.6%</td><td><span class="pattern-ok">&#10003;</span> HTTP 200 — all 36 rates as String</td></tr>
-    <tr><td class="num-col">5</td><td class="count-col">65</td><td class="count-col" style="color:#ef4444;font-weight:600;">6.5%</td><td><span class="pattern-warn">&#9888;</span> HTTP 200 — error body <code>{"message":"Failed to process rates...","status":"error"}</code></td></tr>
+    <tr><td class="num-col">3</td><td class="count-col">74</td><td class="count-col" style="color:#ef4444;font-weight:600;">7.4%</td><td><span class="pattern-warn">&#9888;</span> HTTP 200 — 全部 36 筆記錄缺少 rate 欄位</td></tr>
+    <tr><td class="num-col">4</td><td class="count-col">66</td><td class="count-col">6.6%</td><td><span class="pattern-ok">&#10003;</span> HTTP 200 — 全部 36 個 rate 為 String</td></tr>
+    <tr><td class="num-col">5</td><td class="count-col">65</td><td class="count-col" style="color:#ef4444;font-weight:600;">6.5%</td><td><span class="pattern-warn">&#9888;</span> HTTP 200 — 錯誤 body <code>{"message":"Failed to process rates...","status":"error"}</code></td></tr>
     <tr><td class="num-col">6</td><td class="count-col">59</td><td class="count-col" style="color:#ef4444;font-weight:600;">5.9%</td><td><span class="pattern-err">&#10007;</span> <span class="status-badge s-500">500</span> &nbsp;<code>{"error":"An unexpected internal error occurred"}</code></td></tr>
     <tr><td class="num-col">7</td><td class="count-col">1</td><td class="count-col">0.1%</td><td><span class="pattern-err">&#10007;</span> <span class="status-badge s-429">429</span> &nbsp;<code>{"error":"Rate limit exceeded (1000/day)"}</code></td></tr>
   </tbody>
 </table>
-<p style="margin-top:10px;padding:8px 14px;background:#ef444415;border-left:3px solid #ef4444;border-radius:4px;font-size:0.95rem;"><span style="color:#ef4444;font-weight:700;">⚠ Failure rate: 27.2%</span> <span style="color:#94a3b8;">— 272 / 1001 calls failed or returned unusable data. This upstream is highly unreliable.</span></p>
+<p style="margin-top:10px;padding:8px 14px;background:#ef444415;border-left:3px solid #ef4444;border-radius:4px;font-size:0.95rem;"><span style="color:#ef4444;font-weight:700;">⚠ 失敗率：27.2%</span> <span style="color:#94a3b8;">— 1001 次呼叫中有 272 次失敗或回傳無效資料。此 upstream 極不穩定。</span></p>
 
 <hr class="divider">
 
 <!-- Response body examples -->
-<h2>Response body examples</h2>
+<h2>回應 body 範例</h2>
 
-<h3>Test 1 #1 / Test 2 #1 — ok, rate as Integer</h3>
+<h3>測試一 #1 / 測試二 #1 — 正常，rate 為 Integer</h3>
 <pre>{"rates": [{"hotel": <span class="string">"FloatingPointResort"</span>, "period": <span class="string">"Summer"</span>, "room": <span class="string">"SingletonRoom"</span>, "rate": <span class="number">55700</span>}]}</pre>
-<p>Bulk has 36 entries in the same format, each with <code>"rate": Integer</code>.</p>
+<p>批次查詢回傳相同格式的 36 筆，每筆都有 <code>"rate": Integer</code>。</p>
 
-<h3>Test 1 #2 / Test 2 #4 — ok, rate as String</h3>
+<h3>測試一 #2 / 測試二 #4 — 正常，rate 為 String</h3>
 <pre>{"rates": [{"hotel": <span class="string">"FloatingPointResort"</span>, "period": <span class="string">"Summer"</span>, "room": <span class="string">"SingletonRoom"</span>, "rate": <span class="string">"55700"</span>}]}</pre>
-<p><code>rate</code> is a string instead of a number. HTTP status is still 200. <code>Integer()</code> handles both — no special case needed.</p>
+<p><code>rate</code> 是字串而非數字。HTTP 狀態仍為 200。<code>Integer()</code> 兩種都能處理 — 不需要特殊判斷。</p>
 
-<h3>Test 1 #4 / Test 2 #3 — rate field absent from response</h3>
+<h3>測試一 #4 / 測試二 #3 — 回應中缺少 rate 欄位</h3>
 <pre>{"rates": [{"hotel": <span class="string">"FloatingPointResort"</span>, "period": <span class="string">"Summer"</span>, "room": <span class="string">"SingletonRoom"</span>}]}
 <span class="comment">//                                                                    ^ no "rate" key</span></pre>
-<p><code>rate</code> key is absent entirely. In bulk, all 36 entries are missing — never just a subset. This is an <b>intermittent processing error</b>, not quota exhaustion.</p>
+<p><code>rate</code> key 完全不存在。批次查詢時全部 36 筆都缺少 — 絕不會只有部分缺少。這是<b>間歇性處理錯誤</b>，不是配額耗盡。</p>
 
-<h3>Test 1 #6 / Test 2 #5 — error body</h3>
+<h3>測試一 #6 / 測試二 #5 — 錯誤 body</h3>
 <pre>{"message": <span class="string">"Failed to process rates due to an intermittent issue."</span>, "status": <span class="string">"error"</span>}
 <span class="comment">// No "rates" key at all. "status" is in the body, not the HTTP status (which is 200).</span></pre>
 
 <hr class="divider">
 
 <!-- Key findings -->
-<h2>Key findings</h2>
+<h2>關鍵發現</h2>
 
 <div class="finding warn">
-  <div class="finding-title">Missing <code>rate</code> field is not quota exhaustion</div>
-  <div class="finding-row"><span class="finding-label">Finding</span><span class="finding-value">Initial design assumed a missing <code>rate</code> field meant quota was exhausted. Testing proved otherwise — it is an intermittent processing error appearing ~7% of the time regardless of remaining quota. Quota exhaustion has its own explicit signal: <span class="status-badge s-429">429</span> with <code>{"error":"Rate limit exceeded (1000/day)"}</code>.</span></div>
-  <div class="finding-row"><span class="finding-label">Fix</span><span class="finding-value">Reclassified: HTTP 429 → <code>QuotaExhaustedError</code>. Missing rate field → <code>UpstreamError</code>. Two separate exceptions, two separate client responses.</span></div>
+  <div class="finding-title">缺少 <code>rate</code> 欄位不等於配額耗盡</div>
+  <div class="finding-row"><span class="finding-label">發現</span><span class="finding-value">初始設計假設缺少 <code>rate</code> 欄位代表配額耗盡。測試證明並非如此 — 這是間歇性處理錯誤，約 ~7% 機率出現，與剩餘配額無關。配額耗盡有自己明確的訊號：<span class="status-badge s-429">429</span> 加上 <code>{"error":"Rate limit exceeded (1000/day)"}</code>。</span></div>
+  <div class="finding-row"><span class="finding-label">修正</span><span class="finding-value">重新分類：HTTP 429 → <code>QuotaExhaustedError</code>。缺少 rate 欄位 → <code>UpstreamError</code>。兩種獨立例外，兩條獨立客戶端回應路徑。</span></div>
 </div>
 
 <div class="finding info">
-  <div class="finding-title">All error patterns appear in both single and bulk requests</div>
-  <div class="finding-row"><span class="finding-label">Finding</span><span class="finding-value">Error body and missing rate field patterns confirmed in both test runs.</span></div>
+  <div class="finding-title">所有錯誤模式在單次與批次請求中均會出現</div>
+  <div class="finding-row"><span class="finding-label">發現</span><span class="finding-value">錯誤 body 和缺少 rate 欄位的模式在兩次測試中均已確認。</span></div>
 </div>
 
 <div class="finding warn">
-  <div class="finding-title">Missing rate field in bulk is all-or-nothing</div>
-  <div class="finding-row"><span class="finding-label">Finding</span><span class="finding-value">When the rate field is missing in bulk, all 36 entries are affected — never just a subset. Upstream fails all-or-nothing.</span></div>
+  <div class="finding-title">批次查詢中缺少 rate 欄位是全有或全無</div>
+  <div class="finding-row"><span class="finding-label">發現</span><span class="finding-value">批次查詢中缺少 rate 欄位時，全部 36 筆都受影響 — 絕不會只有部分。Upstream 是全有或全無地失敗。</span></div>
 </div>
 
 <div class="finding info">
-  <div class="finding-title">Both modes show similar instability (~7% 500s, ~7% timeouts)</div>
-  <div class="finding-row"><span class="finding-label">Finding</span><span class="finding-value">Processing 36 combinations does not significantly increase error rates compared to single.</span></div>
+  <div class="finding-title">兩種模式顯示相近的不穩定性（~7% 500 錯誤，~7% timeout）</div>
+  <div class="finding-row"><span class="finding-label">發現</span><span class="finding-value">處理 36 種組合不會比單次查詢顯著增加錯誤率。</span></div>
 </div>
 
 <div class="finding ok">
-  <div class="finding-title">Quota resets on <code>docker compose restart rate-api</code></div>
-  <div class="finding-row"><span class="finding-label">Finding</span><span class="finding-value">Confirmed: restarting the rate-api container resets the daily counter to 0.</span></div>
+  <div class="finding-title">執行 <code>docker compose restart rate-api</code> 後配額重置</div>
+  <div class="finding-row"><span class="finding-label">發現</span><span class="finding-value">已確認：重啟 rate-api 容器會將每日計數器重置為 0。</span></div>
 </div>
 
 <hr class="divider">
 
 <!-- Special cases -->
-<h2>Special cases — upstream input validation</h2>
-<p>Tested directly against the upstream (not via our Rails app).</p>
+<h2>特殊情況 — Upstream 輸入驗證</h2>
+<p>直接對 upstream 測試（非透過 Rails app）。</p>
 
 <table>
-  <thead><tr><th>#</th><th>Scenario</th><th>HTTP Status</th><th>Body</th></tr></thead>
+  <thead><tr><th>#</th><th>情境</th><th>HTTP 狀態碼</th><th>Body</th></tr></thead>
   <tbody>
-    <tr><td class="num-col">1</td><td>No token</td><td><span class="status-badge s-401">401</span></td><td><code>{"error":"Unauthorized"}</code></td></tr>
-    <tr><td class="num-col">2</td><td>Invalid token</td><td><span class="status-badge s-401">401</span></td><td><code>{"error":"Unauthorized"}</code></td></tr>
-    <tr><td class="num-col">3</td><td>Invalid field value (e.g. unknown period)</td><td><span class="status-badge s-400">400</span></td><td><code>{"error":"Invalid attribute: {'period': 'InvalidSeason', ...}"}</code></td></tr>
-    <tr><td class="num-col">4</td><td>Missing field in attribute (e.g. no period)</td><td><span class="status-badge s-400">400</span></td><td><code>{"error":"Invalid attribute: {'hotel': '...', 'room': '...'}"}</code></td></tr>
+    <tr><td class="num-col">1</td><td>無 token</td><td><span class="status-badge s-401">401</span></td><td><code>{"error":"Unauthorized"}</code></td></tr>
+    <tr><td class="num-col">2</td><td>無效 token</td><td><span class="status-badge s-401">401</span></td><td><code>{"error":"Unauthorized"}</code></td></tr>
+    <tr><td class="num-col">3</td><td>無效欄位值（例如未知的 period）</td><td><span class="status-badge s-400">400</span></td><td><code>{"error":"Invalid attribute: {'period': 'InvalidSeason', ...}"}</code></td></tr>
+    <tr><td class="num-col">4</td><td>屬性中缺少欄位（例如無 period）</td><td><span class="status-badge s-400">400</span></td><td><code>{"error":"Invalid attribute: {'hotel': '...', 'room': '...'}"}</code></td></tr>
     <tr><td class="num-col">5</td><td>Request body <code>{"attributes": []}</code> — empty array</td><td><span class="status-badge s-200">200</span></td><td><code>{"rates": []}</code></td></tr>
     <tr><td class="num-col">6</td><td>Request body <code>{}</code> — <code>attributes</code> key missing entirely</td><td><span class="status-badge s-200">200</span></td><td><code>{"rates": []}</code></td></tr>
   </tbody>
 </table>
 
 <div class="card blue" style="margin-top:18px;">
-  <h4>Notes</h4>
-  <p><b>401:</b> empirically verified — upstream does NOT count 401s against its 1000/day quota (1000 invalid-token calls followed by a valid-token call returned 200, not 429). Our QuotaGuard consumes one unit before the HTTP call, but refunds it on 401 since the upstream rejected the request before any processing occurred.</p>
-  <p><b>Special cases #5 / #6:</b> empty/missing attributes return HTTP 200 with <code>{"rates": []}</code>. Our controller validates params first, so this path is unreachable in practice. <code>RateApiClient</code> guards defensively anyway.</p>
+  <h4>備註</h4>
+  <p><b>401：</b>實驗已確認 — upstream <b>不會</b>將 401 計入每日 1,000 次配額（1,000 次無效 token 呼叫後緊接一次有效 token 呼叫，回傳 200 而非 429）。我們的 QuotaGuard 在 HTTP 呼叫前預先消耗一個單位，但在 401 時退還，因為 upstream 在任何處理發生前就拒絕了請求。</p>
+  <p><b>特殊情況 #5 / #6：</b>空的或缺少 attributes 回傳 HTTP 200 加上 <code>{"rates": []}</code>。我們的 controller 先驗證參數，所以這條路徑實際上無法到達。<code>RateApiClient</code> 仍然做了防禦性檢查。</p>
 </div>
 
 <hr class="divider">
 
 <!-- Error handling mapping -->
-<h2>Error handling mapping</h2>
-<p>How <code>RateApiClient</code> maps each upstream response to an exception, and what HTTP status the client receives.</p>
+<h2>錯誤處理對應表</h2>
+<p><code>RateApiClient</code> 如何將每種 upstream 回應對應到例外，以及客戶端收到的 HTTP 狀態碼。</p>
 
 <table>
-  <thead><tr><th>Upstream response</th><th>Exception raised</th><th>Client status</th></tr></thead>
+  <thead><tr><th>Upstream 回應</th><th>拋出的例外</th><th>客戶端狀態碼</th></tr></thead>
   <tbody>
-    <tr><td>HTTP 200, valid rates</td><td>— (success)</td><td><span class="status-badge s-200">200</span></td></tr>
-    <tr><td>HTTP 200, rate as String</td><td>— (<code>Integer()</code> coerces)</td><td><span class="status-badge s-200">200</span></td></tr>
-    <tr><td>HTTP 200, error body (<code>rates</code> key absent)</td><td><code>UpstreamError</code></td><td><span class="status-badge s-502">502</span></td></tr>
-    <tr><td>HTTP 200, rate field absent from response</td><td><code>UpstreamError</code></td><td><span class="status-badge s-502">502</span></td></tr>
-    <tr><td>HTTP 200, empty rates array <code>[]</code></td><td><code>UpstreamError</code></td><td><span class="status-badge s-502">502</span></td></tr>
-    <tr><td>HTTP 401</td><td><code>UnauthorizedError</code> (+ quota refunded)</td><td><span class="status-badge s-502">502</span></td></tr>
+    <tr><td>HTTP 200，有效房價</td><td>— （成功）</td><td><span class="status-badge s-200">200</span></td></tr>
+    <tr><td>HTTP 200，rate 為 String</td><td>— （<code>Integer()</code> 自動轉型）</td><td><span class="status-badge s-200">200</span></td></tr>
+    <tr><td>HTTP 200，錯誤 body（缺少 <code>rates</code> key）</td><td><code>UpstreamError</code></td><td><span class="status-badge s-502">502</span></td></tr>
+    <tr><td>HTTP 200，回應中缺少 rate 欄位</td><td><code>UpstreamError</code></td><td><span class="status-badge s-502">502</span></td></tr>
+    <tr><td>HTTP 200，rates 陣列為空 <code>[]</code></td><td><code>UpstreamError</code></td><td><span class="status-badge s-502">502</span></td></tr>
+    <tr><td>HTTP 401</td><td><code>UnauthorizedError</code>（+ 退還配額）</td><td><span class="status-badge s-502">502</span></td></tr>
     <tr><td>HTTP 429</td><td><code>QuotaExhaustedError</code></td><td><span class="status-badge s-429">429</span></td></tr>
-    <tr><td>HTTP 500 / other non-200</td><td><code>UpstreamError</code></td><td><span class="status-badge s-502">502</span></td></tr>
-    <tr><td>Timeout</td><td><code>TimeoutError</code></td><td><span class="status-badge s-504">504</span></td></tr>
+    <tr><td>HTTP 500 / 其他非 200</td><td><code>UpstreamError</code></td><td><span class="status-badge s-502">502</span></td></tr>
+    <tr><td>逾時</td><td><code>TimeoutError</code></td><td><span class="status-badge s-504">504</span></td></tr>
   </tbody>
 </table>
 
