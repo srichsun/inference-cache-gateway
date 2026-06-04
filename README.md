@@ -53,4 +53,4 @@ Four protective layers on top of a Rails 7.1 API proxy:
 Architecture diagrams, decision trees, failure-mode analysis, trade-off
 discussion, and interactive demos — all in one page:
 
-### **[Open Design Document →](https://inference-cache-gateway.netlify.app/)**
+### **[Open Design Document →](https://srichsun.github.io/inference-cache-gateway/)**
