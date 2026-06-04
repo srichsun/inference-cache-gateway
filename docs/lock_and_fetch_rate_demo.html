@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockAndFetchRate — Interactive Demo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 32px; max-width: 1100px; margin: 0 auto; font-size: 1.05rem; }
+  h1 { font-size: 1.8rem; margin-bottom: 6px; color: #38bdf8; }
+  .subtitle { color: #94a3b8; margin-bottom: 28px; font-size: 1.05rem; }
+  .timing-chain { background: #1e293b; border-radius: 8px; padding: 18px; margin-bottom: 28px; font-family: monospace; font-size: 1rem; line-height: 1.8; }
+  .timing-chain .label { color: #facc15; }
+  .timing-chain .arrow { color: #64748b; }
+
+  .controls { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  button { background: #1e293b; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px; padding: 10px 20px; cursor: pointer; font-size: 1rem; transition: all 0.2s; }
+  button.idle { border-color: #38bdf8; color: #38bdf8; animation: idle-pulse 2s ease-in-out infinite; }
+  button.idle:nth-child(2) { animation-delay: 0.3s; }
+  button.idle:nth-child(3) { animation-delay: 0.6s; }
+  button.idle:nth-child(4) { animation-delay: 0.9s; }
+  @keyframes idle-pulse {
+    0%, 100% { box-shadow: 0 0 6px rgba(56, 189, 248, 0.2); transform: scale(1); }
+    50% { box-shadow: 0 0 16px rgba(56, 189, 248, 0.5), 0 0 32px rgba(56, 189, 248, 0.2); transform: scale(1.03); }
+  }
+  button:hover { background: #334155; border-color: #38bdf8; }
+  button.active { background: #0ea5e9; border-color: #fff; color: #fff; animation: glow 1.5s ease-in-out infinite; transform: scale(1); border-width: 2px; }
+  @keyframes glow {
+    0%, 100% { box-shadow: 0 0 10px rgba(14, 165, 233, 0.6), 0 0 30px rgba(14, 165, 233, 0.3); transform: scale(1); }
+    50% { box-shadow: 0 0 20px rgba(14, 165, 233, 1), 0 0 50px rgba(14, 165, 233, 0.6), 0 0 80px rgba(14, 165, 233, 0.25); transform: scale(1.06); }
+  }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .scenario-hint { color: #94a3b8; font-size: 1.15rem; margin-bottom: 12px; transition: all 0.3s; }
+  .scenario-hint.prompt { color: #38bdf8; font-size: 1.3rem; font-weight: 600; animation: hint-glow 1.8s ease-in-out infinite; }
+  @keyframes hint-glow {
+    0%, 100% { text-shadow: 0 0 8px rgba(56, 189, 248, 0.4); }
+    50% { text-shadow: 0 0 20px rgba(56, 189, 248, 0.9), 0 0 40px rgba(56, 189, 248, 0.4); }
+  }
+
+  .timeline { position: relative; background: #1e293b; border-radius: 8px; padding: 24px; min-height: 460px; overflow: hidden; }
+  .time-axis { position: absolute; bottom: 44px; left: 100px; right: 24px; height: 2px; background: #334155; }
+  .time-label { position: absolute; bottom: 18px; font-size: 0.85rem; color: #64748b; transform: translateX(-50%); }
+  .time-tick { position: absolute; bottom: 42px; width: 1px; height: 8px; background: #475569; transform: translateX(-50%); }
+
+  .request-row { position: relative; height: 56px; margin-bottom: 6px; display: flex; align-items: center; }
+  .request-label { width: 90px; font-size: 0.95rem; color: #94a3b8; flex-shrink: 0; font-weight: 500; }
+  .request-track { position: relative; flex: 1; height: 38px; }
+
+  .bar { position: absolute; height: 38px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 600; transition: all 0.3s ease; opacity: 0; white-space: nowrap; padding: 0 8px; }
+  .bar.leader { background: #0ea5e9; color: #fff; }
+  .bar.leader-lock { background: #8b5cf6; color: #fff; }
+  .bar.leader-fetch { background: #0ea5e9; color: #fff; }
+  .bar.leader-cache { background: #10b981; color: #fff; }
+  .bar.follower-poll { background: #f59e0b; color: #000; }
+  .bar.follower-done { background: #10b981; color: #fff; }
+  .bar.follower-timeout { background: #ef4444; color: #fff; }
+  .bar.crash { background: #ef4444; color: #fff; }
+  .bar.lock-stuck { background: #7c3aed; color: #fff; border: 2px dashed #ef4444; }
+  .bar.lock-expire { background: #334155; color: #94a3b8; border: 1px dashed #64748b; }
+
+  .bar.visible { opacity: 1; }
+  .bar:hover { z-index: 100; transform: scale(1.08) translateY(-2px); box-shadow: 0 4px 16px rgba(56, 189, 248, 0.6); filter: brightness(1.15); cursor: pointer; overflow: visible; }
+  .bar:hover::after { content: attr(data-text); position: absolute; top: -28px; left: 50%; transform: translateX(-50%); background: #0f172a; color: #e2e8f0; padding: 4px 10px; border-radius: 4px; font-size: 0.85rem; white-space: nowrap; border: 1px solid #38bdf8; z-index: 200; pointer-events: none; }
+
+  .legend { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px; padding-top: 18px; border-top: 1px solid #334155; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; color: #94a3b8; }
+  .legend-color { width: 18px; height: 18px; border-radius: 3px; }
+
+  .status { margin-top: 20px; padding: 16px; background: #1e293b; border-radius: 8px; font-size: 0.95rem; line-height: 1.7; color: #cbd5e1; min-height: 90px; max-height: 350px; overflow-y: auto; }
+  .status .step { color: #38bdf8; }
+  .status .warn { color: #f59e0b; }
+  .status .err { color: #ef4444; }
+  .status .ok { color: #10b981; }
+
+  @keyframes nav-idle-pulse {
+    0%, 100% { box-shadow: 0 0 6px rgba(56, 189, 248, 0.2); transform: scale(1); }
+    50% { box-shadow: 0 0 16px rgba(56, 189, 248, 0.5), 0 0 32px rgba(56, 189, 248, 0.2); transform: scale(1.03); }
+  }
+  .back { display: inline-flex; align-items: center; gap: 7px; color: #38bdf8; font-size: 1rem; margin-bottom: 28px; padding: 8px 18px; border: 1.5px solid #38bdf8; border-radius: 7px; transition: all 0.2s; animation: nav-idle-pulse 2s ease-in-out infinite; text-decoration: none; font-weight: 600; }
+  .back:hover { color: #38bdf8; border-color: #38bdf8; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<a href="index.html#lock" class="back">&#8592; Back to Home</a>
+
+<h1>LockAndFetchRate — Interactive Demo</h1>
+<p class="subtitle">Visualize how leader/follower locking prevents duplicate upstream calls</p>
+
+<div class="timing-chain">
+  <span class="label">UPSTREAM_TIMEOUT (5s)</span>
+  <span class="arrow"> → +1s → </span>
+  <span class="label">FOLLOWER_TIMEOUT (6s)</span>
+  <span class="arrow"> → +1s → </span>
+  <span class="label">UPSTREAM_LOCK_AUTO_EXPIRE (7s)</span>
+</div>
+
+<p class="scenario-hint prompt" id="scenario-hint">Click a scenario to start the animation.</p>
+<div class="controls">
+  <button id="btn-normal" class="idle" onclick="runScenario('normal')">Normal Flow</button>
+  <button id="btn-slow" class="idle" onclick="runScenario('slow')">Slow Upstream (4.9s)</button>
+  <button id="btn-upstream-error" class="idle" onclick="runScenario('upstream-error')">Upstream Error &amp; Recovery</button>
+  <button id="btn-recovery-chain" class="idle" onclick="runScenario('recovery-chain')">Recovery Chain (3 leaders)</button>
+  <button id="btn-upstream-timeout" class="idle" onclick="runScenario('upstream-timeout')">Upstream Timeout (5s)</button>
+  <button id="btn-crash" class="idle" onclick="runScenario('crash')">Leader Crash (before cache)</button>
+  <button id="btn-late-crash" class="idle" onclick="runScenario('late-crash')">Leader Crash (after cache)</button>
+  <button id="btn-reset" onclick="resetAll()">Reset</button>
+</div>
+
+<div class="timeline" id="timeline">
+  <div class="request-row">
+    <div class="request-label">Request A</div>
+    <div class="request-track" id="track-a"></div>
+  </div>
+  <div class="request-row">
+    <div class="request-label">Request B</div>
+    <div class="request-track" id="track-b"></div>
+  </div>
+  <div class="request-row">
+    <div class="request-label">Request C</div>
+    <div class="request-track" id="track-c"></div>
+  </div>
+  <div class="request-row">
+    <div class="request-label">Request D</div>
+    <div class="request-track" id="track-d"></div>
+  </div>
+  <div class="request-row">
+    <div class="request-label">Lock</div>
+    <div class="request-track" id="track-lock"></div>
+  </div>
+  <div class="request-row">
+    <div class="request-label">Cache</div>
+    <div class="request-track" id="track-cache"></div>
+  </div>
+
+  <div class="time-axis"></div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-color" style="background:#8b5cf6"></div>Grab lock</div>
+  <div class="legend-item"><div class="legend-color" style="background:#0ea5e9"></div>Call upstream</div>
+  <div class="legend-item"><div class="legend-color" style="background:#10b981"></div>Write/read cache</div>
+  <div class="legend-item"><div class="legend-color" style="background:#f59e0b"></div>Follower polling</div>
+  <div class="legend-item"><div class="legend-color" style="background:#ef4444"></div>Crash / Timeout</div>
+</div>
+
+<div class="status" id="status"></div>
+
+<script>
+const TOTAL_SECONDS = 8;
+const tracks = {};
+let animationTimers = [];
+let currentScenario = null;
+
+function pct(seconds) {
+  return (seconds / TOTAL_SECONDS) * 100;
+}
+
+function getTrack(id) {
+  return document.getElementById('track-' + id);
+}
+
+function addBar(trackId, startS, endS, cls, text) {
+  const track = getTrack(trackId);
+  const bar = document.createElement('div');
+  bar.className = 'bar ' + cls;
+  bar.style.left = pct(startS) + '%';
+  bar.style.width = pct(endS - startS) + '%';
+  bar.textContent = text;
+  bar.title = text;                    // Native browser tooltip
+  bar.setAttribute('data-text', text); // CSS ::after tooltip
+  track.appendChild(bar);
+  return bar;
+}
+
+function showBar(bar, delay) {
+  const t = setTimeout(() => { bar.classList.add('visible'); }, delay);
+  animationTimers.push(t);
+  return t;
+}
+
+function setStatus(html, delay) {
+  const t = setTimeout(() => {
+    const el = document.getElementById('status');
+    const entry = document.createElement('div');
+    entry.style.marginBottom = '10px';
+    entry.style.paddingBottom = '10px';
+    entry.style.borderBottom = '1px solid #334155';
+    entry.innerHTML = html;
+    el.appendChild(entry);
+    entry.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, delay);
+  animationTimers.push(t);
+}
+
+const scenarioLabels = {
+  'btn-normal': 'Normal Flow',
+  'btn-slow': 'Slow Upstream (4.9s)',
+  'btn-upstream-error': 'Upstream Error & Recovery',
+  'btn-recovery-chain': 'Recovery Chain (3 leaders)',
+  'btn-upstream-timeout': 'Upstream Timeout (5s)',
+  'btn-crash': 'Leader Crash (before cache)',
+  'btn-late-crash': 'Leader Crash (after cache)'
+};
+
+function setButtonActive(id) {
+  document.querySelectorAll('.controls button').forEach(b => { b.classList.remove('active'); b.classList.remove('idle'); });
+  document.getElementById(id).classList.add('active');
+  const hint = document.getElementById('scenario-hint');
+  hint.classList.remove('prompt');
+  hint.innerHTML = 'Current scenario: <span style="color:#38bdf8; font-weight:600;">' + (scenarioLabels[id] || '') + '</span>';
+}
+
+function resetAll() {
+  animationTimers.forEach(t => clearTimeout(t));
+  animationTimers = [];
+  currentScenario = null;
+  ['a', 'b', 'c', 'd', 'lock', 'cache'].forEach(id => {
+    getTrack(id).innerHTML = '';
+  });
+  document.getElementById('status').innerHTML = '';
+  const hint = document.getElementById('scenario-hint');
+  hint.textContent = 'Click a scenario to start the animation.';
+  hint.classList.add('prompt');
+  document.querySelectorAll('.controls button').forEach(b => { b.classList.remove('active'); });
+  ['btn-normal', 'btn-slow', 'btn-upstream-error', 'btn-recovery-chain', 'btn-upstream-timeout', 'btn-crash', 'btn-late-crash'].forEach(id => document.getElementById(id).classList.add('idle'));
+
+  // Re-add time labels
+  const timeline = document.getElementById('timeline');
+  timeline.querySelectorAll('.time-label, .time-tick').forEach(el => el.remove());
+  for (let i = 0; i <= TOTAL_SECONDS; i++) {
+    const label = document.createElement('div');
+    label.className = 'time-label';
+    label.style.left = `calc(80px + ${pct(i)}% * (100% - 100px) / 100)`;
+    label.style.left = `calc(80px + ${(i / TOTAL_SECONDS) * 100}% - ${(i / TOTAL_SECONDS) * 100}px)`;
+    label.textContent = i + 's';
+    timeline.appendChild(label);
+  }
+}
+
+function runScenario(name) {
+  resetAll();
+  currentScenario = name;
+  setButtonActive('btn-' + name);
+
+  const speed = 400; // ms per simulated second
+
+  if (name === 'normal') {
+    // Leader A: grab lock (0-0.1s), fetch upstream (0.1-0.5s), write cache (0.5-0.6s)
+    const aLock = addBar('a', 0, 0.2, 'leader-lock', 'SET NX ✓');
+    const aFetch = addBar('a', 0.2, 0.6, 'leader-fetch', 'upstream');
+    const aCache = addBar('a', 0.6, 0.8, 'leader-cache', 'write cache');
+
+    // Followers B,C,D: poll (0-0.8s), then read cache
+    const bPoll = addBar('b', 0, 0.8, 'follower-poll', 'polling...');
+    const bDone = addBar('b', 0.8, 1.0, 'follower-done', 'got it!');
+    const cPoll = addBar('c', 0, 0.85, 'follower-poll', 'polling...');
+    const cDone = addBar('c', 0.85, 1.05, 'follower-done', 'got it!');
+    const dPoll = addBar('d', 0, 0.9, 'follower-poll', 'polling...');
+    const dDone = addBar('d', 0.9, 1.1, 'follower-done', 'got it!');
+
+    // Lock track
+    const lock = addBar('lock', 0, 0.8, 'leader-lock', 'locked');
+    const lockFree = addBar('lock', 0.8, 1.0, 'lock-expire', 'released by ensure');
+
+    // Cache track
+    const cache = addBar('cache', 0.6, 8, 'leader-cache', 'cached (5 min TTL)');
+
+    // Animate
+    showBar(aLock, 0);
+    setStatus('<span class="step">t=0s</span> Request A arrives, grabs lock with SET NX → becomes <b>leader</b><br>Requests B, C, D arrive, lock exists → become <b>followers</b>, start polling', 0);
+    showBar(bPoll, 0);
+    showBar(cPoll, 0);
+    showBar(dPoll, 0);
+    showBar(lock, 0);
+
+    showBar(aFetch, 0.2 * speed);
+    setStatus('<span class="step">t=0.2s</span> Leader A calls upstream API...', 0.2 * speed);
+
+    showBar(aCache, 0.6 * speed);
+    showBar(cache, 0.6 * speed);
+    setStatus('<span class="step">t=0.6s</span> Upstream responds → Leader A writes cache → <span class="ok">releases lock via ensure</span>', 0.6 * speed);
+    showBar(lockFree, 0.8 * speed);
+
+    showBar(bDone, 0.8 * speed);
+    showBar(cDone, 0.85 * speed);
+    showBar(dDone, 0.9 * speed);
+    setStatus('<span class="step">t=0.8s</span> Followers B, C, D read cache on next poll → <span class="ok">all get the same rate</span><br><br><span class="ok">Result: 4 requests, 1 upstream call, 1 quota unit used</span>', 0.9 * speed);
+
+  } else if (name === 'slow') {
+    // Leader A: grab lock, slow upstream (4.9s)
+    const aLock = addBar('a', 0, 0.2, 'leader-lock', 'SET NX ✓');
+    const aFetch = addBar('a', 0.2, 5.1, 'leader-fetch', 'upstream... (4.9s)');
+    const aCache = addBar('a', 5.1, 5.3, 'leader-cache', 'write');
+
+    const bPoll = addBar('b', 0, 5.3, 'follower-poll', 'polling... waiting...');
+    const bDone = addBar('b', 5.3, 5.5, 'follower-done', 'got it!');
+    const cPoll = addBar('c', 0, 5.35, 'follower-poll', 'polling... waiting...');
+    const cDone = addBar('c', 5.35, 5.55, 'follower-done', 'got it!');
+
+    const lock = addBar('lock', 0, 5.3, 'leader-lock', 'locked (waiting for leader...)');
+    const lockFree = addBar('lock', 5.3, 5.5, 'lock-expire', 'released');
+    const cache = addBar('cache', 5.1, 8, 'leader-cache', 'cached (5 min TTL)');
+
+    showBar(aLock, 0);
+    showBar(bPoll, 0);
+    showBar(cPoll, 0);
+    showBar(lock, 0);
+    setStatus('<span class="step">t=0s</span> Leader A grabs lock. Followers B, C start polling.<br><span class="warn">Upstream is slow today...</span>', 0);
+
+    showBar(aFetch, 0.2 * speed);
+    setStatus('<span class="step">t=0.2s</span> Leader A calling upstream... <span class="warn">still waiting...</span>', 0.2 * speed);
+    setStatus('<span class="step">t=3s</span> <span class="warn">Still waiting for upstream... followers keep polling</span>', 3 * speed);
+
+    showBar(aCache, 5.1 * speed);
+    showBar(cache, 5.1 * speed);
+    setStatus('<span class="step">t=5.1s</span> Upstream finally responds at 4.9s! Leader writes cache.', 5.1 * speed);
+
+    showBar(lockFree, 5.3 * speed);
+    showBar(bDone, 5.3 * speed);
+    showBar(cDone, 5.35 * speed);
+    setStatus('<span class="step">t=5.3s</span> Followers read cache → <span class="ok">got it!</span><br><br><span class="ok">Without the +1s buffer (FOLLOWER_TIMEOUT=6s), followers would have given up at 5s and missed the result.</span>', 5.4 * speed);
+
+  } else if (name === 'crash') {
+    // Leader A crashes at 2s
+    const aLock = addBar('a', 0, 0.2, 'leader-lock', 'SET NX ✓');
+    const aFetch = addBar('a', 0.2, 2, 'leader-fetch', 'upstream...');
+    const aCrash = addBar('a', 2, 2.3, 'crash', '💥 crash');
+
+    const bPoll = addBar('b', 0, 6, 'follower-poll', 'polling... no cache appears...');
+    const bTimeout = addBar('b', 6, 6.5, 'follower-timeout', 'TimeoutError');
+    const cPoll = addBar('c', 0, 6, 'follower-poll', 'polling...');
+    const cTimeout = addBar('c', 6, 6.5, 'follower-timeout', 'TimeoutError');
+
+    const lock = addBar('lock', 0, 2, 'leader-lock', 'locked');
+    const lockStuck = addBar('lock', 2, 7, 'lock-stuck', 'stuck! (ensure never ran)');
+    const lockExpire = addBar('lock', 7, 7.5, 'lock-expire', 'auto-expired at 7s');
+
+    // New leader after lock expires
+    const eLock = addBar('d', 7.2, 7.4, 'leader-lock', 'SET NX ✓');
+    const eFetch = addBar('d', 7.4, 7.8, 'leader-fetch', 'upstream');
+    const eCache = addBar('d', 7.8, 8, 'leader-cache', 'write');
+
+    showBar(aLock, 0);
+    showBar(bPoll, 0);
+    showBar(cPoll, 0);
+    showBar(lock, 0);
+    setStatus('<span class="step">t=0s</span> Leader A grabs lock. Followers B, C start polling.', 0);
+
+    showBar(aFetch, 0.2 * speed);
+    setStatus('<span class="step">t=0.2s</span> Leader A calling upstream...', 0.2 * speed);
+
+    showBar(aCrash, 2 * speed);
+    showBar(lockStuck, 2 * speed);
+    setStatus('<span class="step">t=2s</span> <span class="err">Leader A process killed (kill -9)!</span><br><code>ensure</code> never ran → lock is stuck in Redis<br>Followers keep polling... no cache ever appears', 2 * speed);
+
+    setStatus('<span class="step">t=4s</span> <span class="warn">Followers still polling... still nothing...</span>', 4 * speed);
+
+    showBar(bTimeout, 6 * speed);
+    showBar(cTimeout, 6 * speed);
+    setStatus('<span class="step">t=6s</span> <span class="err">FOLLOWER_TIMEOUT reached</span> → B, C give up with TimeoutError<br>Lock is still stuck (expires at 7s)', 6 * speed);
+
+    showBar(lockExpire, 7 * speed);
+    setStatus('<span class="step">t=7s</span> <span class="warn">UPSTREAM_LOCK_AUTO_EXPIRE kicks in</span> → lock auto-deletes<br>The lock is free again for new requests', 7 * speed);
+
+    showBar(eLock, 7.2 * speed);
+    showBar(eFetch, 7.4 * speed);
+    showBar(eCache, 7.8 * speed);
+    setStatus('<span class="step">t=7.2s</span> New Request D arrives → grabs lock → becomes new leader<br>Calls upstream → <span class="ok">writes cache → life goes on</span><br><br><span class="ok">The 7s safety net prevented the lock from being stuck forever.</span><br><span class="warn">Key: FOLLOWER_TIMEOUT (6s) < UPSTREAM_LOCK_AUTO_EXPIRE (7s)<br>All followers gave up BEFORE the lock expired → no duplicate leaders.</span>', 7.8 * speed);
+
+  } else if (name === 'late-crash') {
+    // Leader A: grab lock, call upstream, write cache, then crash BEFORE ensure deletes lock
+    const aLock = addBar('a', 0, 0.2, 'leader-lock', 'SET NX ✓');
+    const aFetch = addBar('a', 0.2, 0.6, 'leader-fetch', 'upstream');
+    const aCache = addBar('a', 0.6, 0.8, 'leader-cache', 'write cache');
+    const aCrash = addBar('a', 0.8, 1.1, 'crash', '💥 crash');
+
+    // Followers: polling, then find cache
+    const bPoll = addBar('b', 0, 0.85, 'follower-poll', 'polling...');
+    const bDone = addBar('b', 0.85, 1.05, 'follower-done', 'got it!');
+    const cPoll = addBar('c', 0, 0.9, 'follower-poll', 'polling...');
+    const cDone = addBar('c', 0.9, 1.1, 'follower-done', 'got it!');
+    const dPoll = addBar('d', 0, 0.95, 'follower-poll', 'polling...');
+    const dDone = addBar('d', 0.95, 1.15, 'follower-done', 'got it!');
+
+    // Lock: stuck after crash, auto-expires at 7s
+    const lock = addBar('lock', 0, 0.8, 'leader-lock', 'locked');
+    const lockStuck = addBar('lock', 0.8, 7, 'lock-stuck', 'stuck! (ensure never ran)');
+    const lockExpire = addBar('lock', 7, 7.5, 'lock-expire', 'auto-expired at 7s');
+
+    // Cache: written BEFORE crash, persists
+    const cache = addBar('cache', 0.6, 8, 'leader-cache', 'cached (5 min TTL) ✓');
+
+    // Animate
+    showBar(aLock, 0);
+    showBar(bPoll, 0);
+    showBar(cPoll, 0);
+    showBar(dPoll, 0);
+    showBar(lock, 0);
+    setStatus('<span class="step">t=0s</span> Leader A grabs lock. Followers B, C, D start polling.', 0);
+
+    showBar(aFetch, 0.2 * speed);
+    setStatus('<span class="step">t=0.2s</span> Leader A calling upstream...', 0.2 * speed);
+
+    showBar(aCache, 0.6 * speed);
+    showBar(cache, 0.6 * speed);
+    setStatus('<span class="step">t=0.6s</span> Upstream responds → Leader A <span class="ok">writes cache successfully</span>', 0.6 * speed);
+
+    showBar(aCrash, 0.8 * speed);
+    showBar(lockStuck, 0.8 * speed);
+    setStatus('<span class="step">t=0.8s</span> <span class="err">Leader A process killed (kill -9) right after writing cache!</span><br><code>ensure</code> never ran → lock is stuck in Redis<br>But cache already has the data...', 0.8 * speed);
+
+    showBar(bDone, 0.85 * speed);
+    showBar(cDone, 0.9 * speed);
+    showBar(dDone, 0.95 * speed);
+    setStatus('<span class="step">t=0.9s</span> Followers B, C, D poll cache → <span class="ok">cache has data → got it!</span><br>Followers don\'t care about the lock — they only read cache.', 0.95 * speed);
+
+    showBar(lockExpire, 7 * speed);
+    setStatus('<span class="step">t=7s</span> <span class="warn">UPSTREAM_LOCK_AUTO_EXPIRE</span> kicks in → stuck lock auto-deletes<br><br><span class="ok">Result: All followers got the rate. The stuck lock is harmless — it just auto-expires later.</span><br><span class="ok">This is the least severe crash scenario: cache was written, everyone wins.</span>', 7 * speed);
+
+  } else if (name === 'upstream-error') {
+    // Leader A: grab lock, call upstream, get error response (5xx or 200-with-error)
+    // ensure runs → lock released cleanly (NOT stuck)
+    // New Request D arrives, becomes Leader 2, succeeds → followers saved early
+    const aLock = addBar('a', 0, 0.2, 'leader-lock', 'SET NX ✓');
+    const aFetch = addBar('a', 0.2, 0.5, 'leader-fetch', 'upstream');
+    const aError = addBar('a', 0.5, 0.7, 'crash', '✗ 502 error');
+
+    // Followers: poll until Leader 2 writes cache, then got it
+    const bPoll = addBar('b', 0, 1.55, 'follower-poll', 'polling...');
+    const bDone = addBar('b', 1.55, 1.75, 'follower-done', 'got it!');
+    const cPoll = addBar('c', 0, 1.6, 'follower-poll', 'polling...');
+    const cDone = addBar('c', 1.6, 1.8, 'follower-done', 'got it!');
+
+    // Lock track: locked → released by ensure → re-locked by Leader 2 → released
+    const lock1 = addBar('lock', 0, 0.5, 'leader-lock', 'locked');
+    const lockFree1 = addBar('lock', 0.5, 0.7, 'lock-expire', 'released by ensure');
+    const lock2 = addBar('lock', 0.7, 1.5, 'leader-lock', 'locked (Leader 2)');
+    const lockFree2 = addBar('lock', 1.5, 1.7, 'lock-expire', 'released');
+
+    // Request D = new Leader 2
+    const dLock = addBar('d', 0.7, 0.9, 'leader-lock', 'SET NX ✓');
+    const dFetch = addBar('d', 0.9, 1.4, 'leader-fetch', 'upstream');
+    const dCache = addBar('d', 1.4, 1.6, 'leader-cache', 'write cache');
+
+    // Cache: written by Leader 2
+    const cache = addBar('cache', 1.4, 8, 'leader-cache', 'cached (5 min TTL) ✓');
+
+    // Animate
+    showBar(aLock, 0);
+    showBar(bPoll, 0);
+    showBar(cPoll, 0);
+    showBar(lock1, 0);
+    setStatus('<span class="step">t=0s</span> Leader A grabs lock. Followers B, C start polling.', 0);
+
+    showBar(aFetch, 0.2 * speed);
+    setStatus('<span class="step">t=0.2s</span> Leader A calling upstream...', 0.2 * speed);
+
+    showBar(aError, 0.5 * speed);
+    showBar(lockFree1, 0.5 * speed);
+    setStatus('<span class="step">t=0.5s</span> <span class="err">Upstream returns 5xx or 200-with-error</span> → Leader A raises UpstreamError → returns 502 to its user<br><span class="ok">ensure runs → lock released cleanly (NOT waiting for 7s expire!)</span>', 0.5 * speed);
+
+    showBar(dLock, 0.7 * speed);
+    showBar(lock2, 0.7 * speed);
+    setStatus('<span class="step">t=0.7s</span> New Request D arrives → grabs lock → becomes <b>Leader 2</b> (natural retry by traffic, no code-level retry)', 0.7 * speed);
+
+    showBar(dFetch, 0.9 * speed);
+    setStatus('<span class="step">t=0.9s</span> Leader 2 calls upstream...', 0.9 * speed);
+
+    showBar(dCache, 1.4 * speed);
+    showBar(cache, 1.4 * speed);
+    showBar(lockFree2, 1.5 * speed);
+    setStatus('<span class="step">t=1.4s</span> Leader 2 succeeds → writes cache → releases lock', 1.4 * speed);
+
+    showBar(bDone, 1.55 * speed);
+    showBar(cDone, 1.6 * speed);
+    setStatus('<span class="step">t=1.6s</span> Followers B, C poll cache → <span class="ok">got it!</span><br><br><span class="ok">Result: 28% upstream failure handled by self-healing. Followers saved at 1.6s, not 7s — because ensure released the lock early.</span>', 1.6 * speed);
+
+  } else if (name === 'upstream-timeout') {
+    // Leader A: grab lock, call upstream that hangs for 5s (UPSTREAM_TIMEOUT)
+    // ensure runs at 5.2s → lock released cleanly (NOT stuck unlike crash)
+    // Followers timeout at 6s anyway since cache never appeared
+    const aLock = addBar('a', 0, 0.2, 'leader-lock', 'SET NX ✓');
+    const aFetch = addBar('a', 0.2, 5.2, 'leader-fetch', 'upstream... (hangs)');
+    const aTimeout = addBar('a', 5.2, 5.5, 'crash', '✗ TimeoutError');
+
+    // Followers: full 6s polling, then 504
+    const bPoll = addBar('b', 0, 6, 'follower-poll', 'polling... no cache appears...');
+    const bTimeout = addBar('b', 6, 6.5, 'follower-timeout', '504 timeout');
+    const cPoll = addBar('c', 0, 6, 'follower-poll', 'polling...');
+    const cTimeout = addBar('c', 6, 6.5, 'follower-timeout', '504 timeout');
+
+    // Lock: locked → released cleanly by ensure at 5.2s (NOT stuck for 7s like crash)
+    const lock = addBar('lock', 0, 5.2, 'leader-lock', 'locked');
+    const lockFree = addBar('lock', 5.2, 5.7, 'lock-expire', 'released by ensure (clean!)');
+
+    // Animate
+    showBar(aLock, 0);
+    showBar(bPoll, 0);
+    showBar(cPoll, 0);
+    showBar(lock, 0);
+    setStatus('<span class="step">t=0s</span> Leader A grabs lock. Followers B, C start polling.', 0);
+
+    showBar(aFetch, 0.2 * speed);
+    setStatus('<span class="step">t=0.2s</span> Leader A calling upstream... <span class="warn">but upstream is hanging</span>', 0.2 * speed);
+
+    setStatus('<span class="step">t=3s</span> <span class="warn">Upstream still not responding. UPSTREAM_TIMEOUT (5s) ticking down...</span>', 3 * speed);
+
+    showBar(aTimeout, 5.2 * speed);
+    showBar(lockFree, 5.2 * speed);
+    setStatus('<span class="step">t=5.2s</span> <span class="err">Net::ReadTimeout</span> → Leader A raises TimeoutError → returns 504<br><span class="ok">ensure runs → lock released cleanly (compare: crash scenario keeps lock stuck till 7s)</span>', 5.2 * speed);
+
+    showBar(bTimeout, 6 * speed);
+    showBar(cTimeout, 6 * speed);
+    setStatus('<span class="step">t=6s</span> <span class="err">FOLLOWER_TIMEOUT (6s) reached</span> → B, C give up with 504<br><br><span class="ok">Difference from crash: ensure ran, lock released at 5.2s (not stuck till 7s).<br>Future requests can retry immediately when they arrive.</span>', 6 * speed);
+
+  } else if (name === 'recovery-chain') {
+    // Three leaders chain: L1 fails → L2 fails → L3 succeeds
+    // Demonstrates natural retry when upstream is consecutively flaky
+    // (28% × 28% × 72% ≈ 5.6% — rare but realistic)
+    // Track order matches arrival order: A (L1) → B (follower) → C (L2) → D (L3)
+
+    // Leader 1 (Request A)
+    const aLock = addBar('a', 0, 0.2, 'leader-lock', 'SET NX ✓ (L1)');
+    const aFetch = addBar('a', 0.2, 0.5, 'leader-fetch', 'upstream');
+    const aError = addBar('a', 0.5, 0.7, 'crash', '✗ 502');
+
+    // Follower B — patient witness throughout
+    const bPoll = addBar('b', 0, 2.45, 'follower-poll', 'polling...');
+    const bDone = addBar('b', 2.45, 2.65, 'follower-done', 'got it!');
+
+    // Leader 2 (Request C)
+    const cLock = addBar('c', 0.7, 0.9, 'leader-lock', 'SET NX ✓ (L2)');
+    const cFetch = addBar('c', 0.9, 1.4, 'leader-fetch', 'upstream');
+    const cError = addBar('c', 1.4, 1.6, 'crash', '✗ 502');
+
+    // Leader 3 (Request D) — the survivor
+    const dLock = addBar('d', 1.6, 1.8, 'leader-lock', 'SET NX ✓ (L3)');
+    const dFetch = addBar('d', 1.8, 2.3, 'leader-fetch', 'upstream');
+    const dCache = addBar('d', 2.3, 2.5, 'leader-cache', 'write cache');
+
+    // Lock track: 3 acquisitions, 3 clean releases (ensure runs every time)
+    const lock1 = addBar('lock', 0, 0.5, 'leader-lock', 'L1 locked');
+    const free1 = addBar('lock', 0.5, 0.7, 'lock-expire', 'released');
+    const lock2 = addBar('lock', 0.7, 1.4, 'leader-lock', 'L2 locked');
+    const free2 = addBar('lock', 1.4, 1.6, 'lock-expire', 'released');
+    const lock3 = addBar('lock', 1.6, 2.3, 'leader-lock', 'L3 locked');
+    const free3 = addBar('lock', 2.3, 2.5, 'lock-expire', 'released');
+
+    // Cache: written by L3, persists
+    const cache = addBar('cache', 2.3, 8, 'leader-cache', 'cached (5 min TTL) ✓');
+
+    // Animate
+    showBar(aLock, 0);
+    showBar(bPoll, 0);
+    showBar(lock1, 0);
+    setStatus('<span class="step">t=0s</span> Leader 1 (Request A) grabs lock. Follower B starts polling.', 0);
+
+    showBar(aFetch, 0.2 * speed);
+    setStatus('<span class="step">t=0.2s</span> Leader 1 calling upstream...', 0.2 * speed);
+
+    showBar(aError, 0.5 * speed);
+    showBar(free1, 0.5 * speed);
+    setStatus('<span class="step">t=0.5s</span> <span class="err">Leader 1 fails (5xx)</span> → ensure releases lock', 0.5 * speed);
+
+    showBar(cLock, 0.7 * speed);
+    showBar(lock2, 0.7 * speed);
+    setStatus('<span class="step">t=0.7s</span> <b>Leader 2 (Request C)</b> arrives, grabs lock', 0.7 * speed);
+
+    showBar(cFetch, 0.9 * speed);
+    setStatus('<span class="step">t=0.9s</span> Leader 2 calling upstream...', 0.9 * speed);
+
+    showBar(cError, 1.4 * speed);
+    showBar(free2, 1.4 * speed);
+    setStatus('<span class="step">t=1.4s</span> <span class="err">Leader 2 also fails! (28% × 28% × 72% ≈ 5.6% chance of two consecutive failures then success)</span> → ensure releases lock', 1.4 * speed);
+
+    showBar(dLock, 1.6 * speed);
+    showBar(lock3, 1.6 * speed);
+    setStatus('<span class="step">t=1.6s</span> <b>Leader 3 (Request D)</b> arrives, grabs lock', 1.6 * speed);
+
+    showBar(dFetch, 1.8 * speed);
+    setStatus('<span class="step">t=1.8s</span> Leader 3 calling upstream...', 1.8 * speed);
+
+    showBar(dCache, 2.3 * speed);
+    showBar(cache, 2.3 * speed);
+    showBar(free3, 2.3 * speed);
+    setStatus('<span class="step">t=2.3s</span> <span class="ok">Leader 3 succeeds → writes cache → releases lock</span>', 2.3 * speed);
+
+    showBar(bDone, 2.45 * speed);
+    setStatus('<span class="step">t=2.45s</span> Follower B polls cache → <span class="ok">got it!</span><br><br><span class="ok">Result: 2 consecutive upstream failures (rare but real) survived without code-level retry.<br>Each new request becomes the next leader naturally — quota burned: 3 (one per failed attempt + the successful one).</span>', 2.5 * speed);
+  }
+}
+
+// Init time labels
+resetAll();
+
+// Auto-run scenario from URL hash (e.g. #recovery-chain links from index.html)
+const validScenarios = ['normal', 'slow', 'upstream-error', 'recovery-chain', 'upstream-timeout', 'crash', 'late-crash'];
+const hashScenario = window.location.hash.replace('#', '');
+if (validScenarios.includes(hashScenario)) {
+  setTimeout(() => runScenario(hashScenario), 200);
+}
+</script>
+</body>
+</html>

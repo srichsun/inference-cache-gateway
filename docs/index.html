@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inference Cache Gateway — Dane Wu</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 32px; max-width: 1100px; margin: 0 auto; line-height: 1.7; font-size: 1.05rem; }
+  h1 { font-size: 2rem; color: #38bdf8; margin-bottom: 6px; }
+  .subtitle { color: #94a3b8; margin-bottom: 8px; font-size: 1.05rem; }
+  .author { color: #64748b; margin-bottom: 32px; font-size: 0.95rem; }
+  .author strong { color: #e2e8f0; }
+  section { scroll-margin-top: 150px; }
+  h2 { font-size: 1.4rem; color: #38bdf8; margin: 36px 0 14px; padding-bottom: 8px; border-bottom: 1px solid #1e293b; }
+  h3 { font-size: 1.15rem; color: #f59e0b; margin: 24px 0 10px; }
+  p { margin-bottom: 14px; color: #cbd5e1; font-size: 1.05rem; }
+  code { background: #1e293b; padding: 2px 8px; border-radius: 3px; font-size: 0.95rem; color: #38bdf8; }
+  pre { background: #1e293b; border-radius: 8px; padding: 18px; overflow-x: auto; margin: 14px 0; font-size: 0.92rem; line-height: 1.6; color: #e2e8f0; }
+  a { color: #38bdf8; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .comment { color: #64748b; }
+  .keyword { color: #c084fc; }
+  .string { color: #34d399; }
+  .number { color: #f59e0b; }
+  .highlight { color: #f59e0b; font-weight: 600; }
+
+  /* Nav hint */
+  .nav-hint { color: #38bdf8; font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; animation: hint-glow 1.8s ease-in-out infinite; background: #0f172a; padding-top: 14px; }
+  .nav-hint.scrolled { font-size: 1.05rem; color: #94a3b8; animation: none; text-shadow: none; }
+  @keyframes hint-glow {
+    0%, 100% { text-shadow: 0 0 8px rgba(56, 189, 248, 0.4); }
+    50% { text-shadow: 0 0 20px rgba(56, 189, 248, 0.9), 0 0 40px rgba(56, 189, 248, 0.4); }
+  }
+
+  /* Nav */
+  .nav-wrap { background: #0f172a; border-bottom: 1px solid #1e293b; margin-bottom: 28px; }
+  .nav-wrap.fixed { position: fixed; top: 0; left: 0; right: 0; padding: 14px 32px; z-index: 100; border-bottom: 1px solid #1e293b; }
+  .nav-wrap.fixed .nav-inner { max-width: 1036px; margin: 0 auto; }
+  .nav { padding: 14px 0; display: block; }
+  .nav-wrap.fixed .nav { padding: 0; }
+  .nav .nav-group + .nav-group { margin-top: 6px; }
+  .nav .nav-group { width: 100%; }
+  .nav a { color: #94a3b8; text-decoration: none; font-size: 0.88rem; padding: 5px 12px; border-radius: 5px; border: 1px solid #334155; transition: all 0.2s; white-space: nowrap; }
+  .nav a:hover { color: #38bdf8; border-color: #38bdf8; background: #334155; text-decoration: none; }
+  .nav-sep { color: #475569; font-size: 1rem; padding: 0 6px; user-select: none; font-weight: 300; display: none; }
+  .nav-group { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; width: 100%; }
+  .nav-group-label { color: #38bdf8; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 10px; background: #1e293b; border-radius: 4px; border: 1px solid #334155; white-space: nowrap; }
+  .nav a.nav-featured { font-weight: 600; border-color: #f59e0b; color: #f59e0b; }
+  .nav a.nav-featured:hover { border-color: #fbbf24; color: #fbbf24; background: #f59e0b15; }
+  .nav a.nav-featured.active { background: #f59e0b; color: #0f172a; border-color: #f59e0b; }
+  .nav a.idle { border-color: #38bdf8; color: #38bdf8; animation: nav-idle-pulse 2s ease-in-out infinite; }
+  .nav a.idle:nth-of-type(2) { animation-delay: 0.12s; }
+  .nav a.idle:nth-of-type(3) { animation-delay: 0.24s; }
+  .nav a.idle:nth-of-type(4) { animation-delay: 0.36s; }
+  .nav a.idle:nth-of-type(5) { animation-delay: 0.48s; }
+  .nav a.idle:nth-of-type(6) { animation-delay: 0.60s; }
+  .nav a.idle:nth-of-type(7) { animation-delay: 0.72s; }
+  .nav a.idle:nth-of-type(8) { animation-delay: 0.84s; }
+  .nav a.idle:nth-of-type(9) { animation-delay: 0.96s; }
+  .nav a.idle:nth-of-type(10) { animation-delay: 1.08s; }
+  .nav a.idle:nth-of-type(11) { animation-delay: 1.20s; }
+  .nav a.idle:nth-of-type(12) { animation-delay: 1.32s; }
+  .nav a.idle:nth-of-type(13) { animation-delay: 1.44s; }
+  .nav a.idle:nth-of-type(14) { animation-delay: 1.56s; }
+  .nav a.idle:nth-of-type(15) { animation-delay: 1.68s; }
+  .nav a.idle:nth-of-type(16) { animation-delay: 1.80s; }
+  .nav a.idle:nth-of-type(17) { animation-delay: 1.92s; }
+  @keyframes nav-idle-pulse {
+    0%, 100% { box-shadow: 0 0 6px rgba(56, 189, 248, 0.2); transform: scale(1); }
+    50% { box-shadow: 0 0 16px rgba(56, 189, 248, 0.5), 0 0 32px rgba(56, 189, 248, 0.2); transform: scale(1.03); }
+  }
+  .nav a.active { color: #fff; background: #0ea5e9; border-color: #fff; border-width: 2px; animation: nav-active-glow 1.5s ease-in-out infinite; }
+  @keyframes nav-active-glow {
+    0%, 100% { box-shadow: 0 0 10px rgba(14, 165, 233, 0.6), 0 0 30px rgba(14, 165, 233, 0.3); transform: scale(1); }
+    50% { box-shadow: 0 0 20px rgba(14, 165, 233, 1), 0 0 50px rgba(14, 165, 233, 0.6), 0 0 80px rgba(14, 165, 233, 0.25); transform: scale(1.06); }
+  }
+
+  /* Cards */
+  .card { background: #1e293b; border-radius: 8px; padding: 22px; margin-bottom: 18px; border-left: 4px solid #334155; }
+  .card.blue { border-left-color: #38bdf8; }
+  .card.yellow { border-left-color: #f59e0b; }
+  .card.green { border-left-color: #10b981; }
+  .card.red { border-left-color: #ef4444; }
+  .card.purple { border-left-color: #8b5cf6; }
+  .card h4 { font-size: 1rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+  .card p { margin-bottom: 10px; }
+  .card p:last-child { margin-bottom: 0; }
+
+  /* Results hero */
+  .tldr-hero { margin-bottom: 32px; position: relative; }
+  .tldr-hero h2 { font-size: 1.4rem; color: #38bdf8; margin-bottom: 18px; padding-bottom: 8px; border-bottom: 1px solid #1e293b; }
+  .tldr-stats { display: flex; flex-direction: column; gap: 12px; position: relative; }
+  .tldr-stat { background: #1e293b; border-radius: 12px; padding: 18px 28px; border: 1px solid #334155; display: flex; align-items: center; gap: 24px; animation: stat-glow 3s ease-in-out infinite; }
+  .tldr-stat:nth-child(1) { animation-delay: 0s; }
+  .tldr-stat:nth-child(2) { animation-delay: 0.75s; }
+  .tldr-stat:nth-child(3) { animation-delay: 1.5s; }
+  .tldr-stat:nth-child(4) { animation-delay: 2.25s; }
+  @keyframes stat-glow {
+    0%, 100% { box-shadow: 0 0 0 rgba(56, 189, 248, 0); border-color: #334155; }
+    50% { box-shadow: 0 0 20px var(--glow-color, rgba(56, 189, 248, 0.3)), 0 0 40px var(--glow-color, rgba(56, 189, 248, 0.1)); border-color: var(--border-color, #38bdf8); }
+  }
+  .tldr-stat .num { font-size: 2rem; font-weight: 800; min-width: 120px; text-align: right; line-height: 1; flex-shrink: 0; }
+  .tldr-stat .stat-text { display: flex; flex-direction: column; }
+  .tldr-stat .label { font-size: 0.95rem; color: #e2e8f0; font-weight: 600; }
+  .tldr-stat .desc { font-size: 0.8rem; color: #64748b; margin-top: 3px; line-height: 1.3; }
+  .tldr-stat.green { --glow-color: rgba(16, 185, 129, 0.25); --border-color: #10b981; }
+  .tldr-stat.blue { --glow-color: rgba(56, 189, 248, 0.25); --border-color: #38bdf8; }
+  .tldr-stat.yellow { --glow-color: rgba(245, 158, 11, 0.25); --border-color: #f59e0b; }
+  .tldr-stat.purple { --glow-color: rgba(167, 139, 250, 0.25); --border-color: #a78bfa; }
+  .tldr-stat.pink { --glow-color: rgba(236, 72, 153, 0.30); --border-color: #ec4899; }
+  .tldr-stat.green .num { color: #10b981; }
+  .tldr-stat.yellow .num { color: #f59e0b; }
+  .tldr-stat.blue .num { color: #38bdf8; }
+  .tldr-stat.purple .num { color: #a78bfa; }
+  .tldr-stat.pink .num { color: #ec4899; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.95rem; }
+  th { text-align: left; padding: 10px 14px; background: #1e293b; color: #94a3b8; border-bottom: 1px solid #334155; }
+  td { padding: 10px 14px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+  tr:hover td { background: #1e293b; }
+  .status-badge { padding: 3px 10px; border-radius: 4px; font-size: 0.9rem; font-weight: 600; }
+  .s-200 { background: #10b98120; color: #10b981; }
+  .s-400 { background: #64748b20; color: #94a3b8; }
+  .s-401 { background: #f59e0b20; color: #f59e0b; }
+  .s-429 { background: #f59e0b20; color: #f59e0b; }
+  .s-502 { background: #ef444420; color: #ef4444; }
+  .s-504 { background: #8b5cf620; color: #8b5cf6; }
+  .s-500 { background: #ef444420; color: #ef4444; }
+
+  /* Math */
+  .math { background: #1e293b; border-radius: 6px; padding: 14px 20px; font-family: monospace; font-size: 1rem; margin: 10px 0; color: #f59e0b; text-align: center; }
+
+  /* Funnel */
+  .mechanisms-hero { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 2px solid #38bdf8; border-radius: 16px; padding: 36px 32px 28px; margin-bottom: 18px; position: relative; overflow: hidden; }
+  .mechanisms-hero::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle at 30% 40%, rgba(56,189,248,0.06) 0%, transparent 50%); pointer-events: none; }
+  .mechanisms-title { font-size: 1.6rem; font-weight: 700; color: #fff; text-align: center; margin-bottom: 6px; }
+  .mechanisms-subtitle { font-size: 1rem; color: #94a3b8; text-align: center; margin-bottom: 28px; }
+  .funnel { display: flex; flex-direction: column; align-items: center; gap: 0; margin-bottom: 28px; }
+  .funnel-entry { text-align: center; color: #94a3b8; font-size: 0.95rem; margin-bottom: 4px; }
+  .funnel-entry .big { font-size: 1.5rem; font-weight: 700; color: #e2e8f0; display: block; }
+  .funnel-arrow { color: #475569; font-size: 1.1rem; padding: 4px 0; }
+  .funnel-arrow .blocked { font-size: 0.8rem; margin-left: 8px; }
+  .funnel-layer { display: flex; align-items: center; gap: 0; width: 100%; max-width: 700px; }
+  .funnel-layer-num { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: 800; flex-shrink: 0; }
+  .funnel-layer-body { flex: 1; display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-radius: 10px; margin-left: 12px; border: 2px solid; }
+  .funnel-layer-left { display: flex; flex-direction: column; }
+  .funnel-layer-label { font-size: 1.15rem; font-weight: 700; color: #fff; }
+  .funnel-layer-code { font-size: 0.78rem; color: #64748b; font-family: monospace; margin-top: 2px; }
+  .funnel-layer-right { text-align: right; font-size: 0.85rem; color: #94a3b8; max-width: 260px; line-height: 1.4; }
+  .funnel-layer-effect { display: inline-block; font-size: 0.8rem; font-weight: 600; padding: 2px 10px; border-radius: 4px; margin-top: 4px; }
+  .fl-cache .funnel-layer-num { background: #10b98130; color: #10b981; }
+  .fl-cache .funnel-layer-body { border-color: #10b981; background: #10b98108; }
+  .fl-cache .funnel-layer-effect { background: #10b98120; color: #10b981; }
+  .fl-lock .funnel-layer-num { background: #8b5cf630; color: #a78bfa; }
+  .fl-lock .funnel-layer-body { border-color: #8b5cf6; background: #8b5cf608; }
+  .fl-lock .funnel-layer-effect { background: #8b5cf620; color: #a78bfa; }
+  .fl-quota .funnel-layer-num { background: #f9731630; color: #f97316; }
+  .fl-quota .funnel-layer-body { border-color: #f97316; background: #f9731608; }
+  .fl-quota .funnel-layer-effect { background: #f9731620; color: #f97316; }
+  .fl-batch .funnel-layer-num { background: #f59e0b30; color: #f59e0b; }
+  .fl-batch .funnel-layer-body { border-color: #f59e0b; background: #f59e0b08; }
+  .fl-batch .funnel-layer-effect { background: #f59e0b20; color: #f59e0b; }
+  .mechanisms-result { text-align: center; padding: 16px; background: #10b98115; border: 1px solid #10b981; border-radius: 10px; }
+  .result-label { color: #94a3b8; font-size: 1rem; }
+  .result-number { font-size: 2rem; font-weight: 800; color: #10b981; margin: 0 6px; }
+  .result-unit { color: #10b981; font-size: 1.1rem; font-weight: 600; }
+  .result-context { display: block; color: #64748b; font-size: 0.9rem; margin-top: 6px; }
+  @media (max-width: 640px) {
+    .funnel-layer-body { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .funnel-layer-right { text-align: left; max-width: none; }
+  }
+
+  /* Flow diagram */
+  .flow { display: flex; flex-direction: column; gap: 0; align-items: center; margin: 24px 0; }
+  .flow-step { background: #1e293b; border-radius: 8px; padding: 14px 24px; text-align: center; font-size: 1rem; min-width: 400px; position: relative; }
+  .flow-step.controller { border: 2px solid #38bdf8; color: #38bdf8; }
+  .flow-step.service { border: 2px solid #f59e0b; color: #f59e0b; }
+  .flow-step.cache { border: 2px solid #10b981; color: #10b981; }
+  .flow-step.lock { border: 2px solid #8b5cf6; color: #8b5cf6; }
+  .flow-step.quota { border: 2px solid #f97316; color: #f97316; }
+  .flow-step.api { border: 2px solid #ef4444; color: #ef4444; }
+  .flow-step .detail { color: #94a3b8; font-size: 0.9rem; margin-top: 6px; }
+  .flow-arrow { color: #475569; font-size: 1.3rem; padding: 5px 0; }
+
+  /* Before/After */
+  .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 14px 0; }
+  .comparison .side { background: #1e293b; border-radius: 8px; padding: 20px; min-width: 0; overflow-x: auto; }
+  .comparison .side pre { word-break: break-word; white-space: pre-wrap; }
+  .comparison .side h4 { margin-bottom: 10px; font-size: 1.1rem; }
+  .comparison .before h4 { color: #ef4444; }
+  .comparison .after h4 { color: #10b981; }
+  @media (max-width: 640px) { .comparison { grid-template-columns: 1fr; } }
+
+  /* Timing chain */
+  .timing { display: flex; align-items: center; justify-content: center; gap: 0; margin: 24px 0; flex-wrap: wrap; }
+  .timing-box { padding: 14px 22px; border-radius: 7px; text-align: center; font-size: 1.05rem; font-weight: 600; }
+  .timing-box .label { font-size: 0.8rem; color: #94a3b8; display: block; margin-top: 4px; font-weight: 400; }
+  .timing-box.t1 { background: #0ea5e920; color: #38bdf8; border: 1px solid #0ea5e9; }
+  .timing-box.t2 { background: #f59e0b20; color: #f59e0b; border: 1px solid #f59e0b; }
+  .timing-box.t3 { background: #8b5cf620; color: #a78bfa; border: 1px solid #8b5cf6; }
+  .timing-arrow { color: #475569; padding: 0 12px; font-size: 1rem; }
+
+  /* Decision accordion */
+  .decision { background: #1e293b; border-radius: 10px; margin-bottom: 14px; border: 1px solid #334155; overflow: hidden; transition: border-color 0.3s; }
+  .decision.open { border-color: #38bdf8; }
+  .decision-header { display: flex; align-items: center; padding: 16px 20px; cursor: pointer; user-select: none; gap: 14px; transition: background 0.2s; }
+  .decision-header:hover { background: #334155; }
+  .decision-num { width: 32px; height: 32px; border-radius: 50%; background: #38bdf820; color: #38bdf8; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.95rem; flex-shrink: 0; }
+  .decision-title { flex: 1; font-size: 1.05rem; font-weight: 600; color: #e2e8f0; }
+  .decision-choice { font-size: 0.85rem; color: #10b981; background: #10b98115; padding: 3px 12px; border-radius: 4px; flex-shrink: 0; }
+  .decision-arrow { color: #475569; font-size: 0.9rem; transition: transform 0.3s; flex-shrink: 0; }
+  .decision.open .decision-arrow { transform: rotate(90deg); }
+  .decision-body { display: none; padding: 0 20px 20px; }
+  .decision.open .decision-body { display: block; }
+  .decision-body p { font-size: 0.95rem; }
+  .decision-body table { font-size: 0.9rem; }
+  .decision-body pre { font-size: 0.88rem; }
+
+  /* Finding cards */
+  .finding { background: #1e293b; border-radius: 8px; padding: 18px 22px; margin-bottom: 14px; border-left: 3px solid #334155; }
+  .finding-title { font-size: 1rem; font-weight: 600; color: #e2e8f0; margin-bottom: 8px; }
+  .finding-row { display: flex; gap: 8px; margin-bottom: 6px; font-size: 0.92rem; }
+  .finding-label { font-weight: 600; color: #94a3b8; min-width: 80px; flex-shrink: 0; }
+  .finding-value { color: #cbd5e1; }
+  .finding.warn { border-left-color: #f59e0b; }
+  .finding.danger { border-left-color: #ef4444; }
+  .finding.info { border-left-color: #38bdf8; }
+  .finding.ok { border-left-color: #10b981; }
+
+  /* Cmd block */
+  .cmd { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 16px 20px; margin: 14px 0; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.9rem; line-height: 1.8; }
+  .cmd .prompt { color: #10b981; user-select: none; }
+  .cmd .comment { color: #475569; }
+  .cmd-line { position: relative; display: flex; align-items: baseline; gap: 0; margin: 4px 0; }
+  .cmd-line .prompt { color: #10b981; user-select: none; }
+  .cmd-line code { flex: 1; color: #e2e8f0; background: none; padding: 0; font-size: inherit; }
+  .cmd-line .copy-btn { position: absolute; right: 0; top: 0; background: #334155; color: #94a3b8; border: 1px solid #475569; border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .cmd-line .copy-btn:hover { background: #475569; color: #e2e8f0; }
+  .cmd-line .copy-btn.copied { background: #10b981; color: #0f172a; border-color: #10b981; opacity: 1; }
+
+  /* Env table */
+  .env-table { margin: 14px 0; }
+  .env-row { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid #1e293b; font-size: 0.95rem; }
+  .env-var { font-family: monospace; color: #38bdf8; min-width: 180px; flex-shrink: 0; }
+  .env-desc { color: #94a3b8; }
+
+  /* Test grid */
+  .test-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin: 14px 0; }
+  .test-card { background: #1e293b; border-radius: 8px; padding: 16px 18px; border: 1px solid #334155; }
+  .test-card-name { font-size: 1rem; font-weight: 600; color: #e2e8f0; margin-bottom: 6px; font-family: monospace; }
+  .test-card-desc { font-size: 0.88rem; color: #94a3b8; line-height: 1.5; }
+  .test-card-tool { font-size: 0.78rem; color: #64748b; margin-top: 8px; }
+
+  /* Non-goals */
+  .nongoal { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #1e293b; }
+  .nongoal-icon { flex-shrink: 0; font-size: 1.1rem; margin-top: 2px; }
+  .nongoal-text { font-size: 0.95rem; color: #cbd5e1; }
+  .nongoal-text strong { color: #e2e8f0; }
+  .nongoal-reason { font-size: 0.85rem; color: #64748b; margin-top: 4px; }
+  .nongoal.done .nongoal-icon { color: #10b981; }
+  .nongoal.skip .nongoal-icon { color: #64748b; }
+
+  /* Report link button */
+  .report-link { display:inline-block; padding:8px 18px; background:#1e293b; border:1px solid #334155; border-radius:6px; color:#38bdf8; font-size:0.9rem; text-decoration:none; transition: background 0.15s, border-color 0.15s, box-shadow 0.15s; animation: nav-idle-pulse 2s ease-in-out infinite; }
+  .report-link:hover { background:#1e3a5f; border-color:#38bdf8; box-shadow:0 0 10px #38bdf830; text-decoration:none; }
+
+  /* File tree */
+  .tree { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 18px 22px; margin: 14px 0; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85rem; line-height: 1.7; overflow-x: auto; }
+  .tree .new { color: #10b981; }
+  .tree .modified { color: #f59e0b; }
+  .tree .note { color: #64748b; }
+
+  /* Links */
+  .demo-link { display: inline-block; margin-top: 10px; padding: 8px 18px; background: #0ea5e920; color: #38bdf8; border: 1px solid #0ea5e9; border-radius: 6px; text-decoration: none; font-size: 1rem; transition: all 0.2s; animation: nav-idle-pulse 2s ease-in-out infinite; }
+  .demo-link:hover { background: #0ea5e940; text-decoration: none; }
+
+  /* Assumptions */
+  .assumption { background: #1e293b; border-radius: 8px; padding: 16px 20px; margin-bottom: 12px; display: flex; gap: 14px; }
+  .assumption-num { width: 28px; height: 28px; border-radius: 50%; background: #f59e0b20; color: #f59e0b; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; flex-shrink: 0; margin-top: 2px; }
+  .assumption-text { font-size: 0.95rem; color: #cbd5e1; }
+
+  /* --- Responsive: wide tablet / narrow desktop --- */
+  @media (max-width: 1024px) {
+    body { padding: 24px; }
+    .nav-wrap.fixed { padding: 12px 24px; }
+    .nav a { font-size: 0.82rem; padding: 4px 10px; }
+    .nav-group-label { font-size: 0.72rem; padding: 3px 8px; }
+    table { display: block; overflow-x: auto; max-width: 100%; }
+    pre, .tree { overflow-x: auto; max-width: 100%; }
+  }
+
+  /* --- Responsive: small tablet --- */
+  @media (max-width: 768px) {
+    body { padding: 18px; font-size: 0.95rem; }
+    h1 { font-size: 1.6rem; }
+    h2 { font-size: 1.2rem; }
+    .nav-wrap.fixed { padding: 10px 18px; }
+    .nav a { font-size: 0.78rem; padding: 4px 8px; }
+    .funnel-layer { max-width: 100%; }
+    .funnel-layer-num { width: 36px; height: 36px; font-size: 0.95rem; }
+    .funnel-layer-label { font-size: 1rem; }
+    .funnel-layer-right { font-size: 0.78rem; max-width: 200px; }
+    .mechanisms-hero { padding: 24px 18px 20px; }
+    img { max-width: 100%; height: auto; }
+  }
+
+  /* --- Responsive: mobile (minimal — keep readable) --- */
+  @media (max-width: 640px) {
+    body { padding: 14px; }
+    .tldr-stats { flex-direction: column; }
+    .nav { gap: 6px; }
+    .nav a { font-size: 0.76rem; padding: 4px 7px; }
+    .nav-group-label { font-size: 0.68rem; padding: 3px 6px; }
+    .flow-step { min-width: auto; }
+    .funnel-layer-right { text-align: left; max-width: none; font-size: 0.75rem; }
+    pre, .tree { font-size: 0.72rem; }
+    table { font-size: 0.82rem; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Inference Cache Gateway</h1>
+<p class="subtitle">A Case Study in Caching & Quota Design</p>
+<p class="author">By <strong>Dane Wu</strong></p>
+
+<!-- Results Hero -->
+<div class="tldr-hero">
+  <h2>Results</h2>
+  <div class="tldr-stats">
+    <a href="#verified" class="tldr-stat pink" style="text-decoration:none; color:inherit; cursor:pointer;">
+      <span class="num">PASS</span>
+      <div class="stat-text">
+        <span class="label">All 4 Load &amp; Chaos Tests <span style="font-size:0.7rem; color:#ec4899; font-weight:700; margin-left:6px;">▸ JUMP</span></span>
+        <span class="desc">Single-flight &middot; cache hit rate &middot; quota cap &middot; fail-closed &mdash; all verified on a live stack</span>
+      </div>
+    </a>
+    <div class="tldr-stat green">
+      <span class="num">0 ~ 288</span>
+      <div class="stat-text">
+        <span class="label">API Calls / Day</span>
+        <span class="desc">Achieves the <b>math floor</b>: 288/day, the lowest possible under a 5-min TTL.</span>
+      </div>
+    </div>
+    <div class="tldr-stat yellow">
+      <span class="num">36&times;</span>
+      <div class="stat-text">
+        <span class="label">Quota Efficiency</span>
+        <span class="desc">1 API call fills all 36 cache entries at once</span>
+      </div>
+    </div>
+    <div class="tldr-stat blue">
+      <span class="num">100%</span>
+      <div class="stat-text">
+        <span class="label">Test Coverage</span>
+        <span class="desc">SimpleCov &mdash; scaffold files excluded</span>
+      </div>
+    </div>
+    <div class="tldr-stat purple">
+      <span class="num">0</span>
+      <div class="stat-text">
+        <span class="label">RuboCop Offenses</span>
+        <span class="desc">Zero warnings, zero exceptions</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="nav-hint" id="nav-hint">Click a section to jump to it.</p>
+<div class="nav-wrap" id="nav-wrap">
+<div class="nav-inner">
+<nav class="nav" id="nav">
+  <div class="nav-group">
+    <span class="nav-group-label">Overview</span>
+    <a href="#challenge" class="idle">Challenge</a>
+    <a href="#funnel" class="idle">Solution</a>
+    <a href="#architecture" class="idle">Architecture</a>
+    <a href="#quickstart" class="idle">Quick Start</a>
+  </div>
+  <div class="nav-group">
+    <span class="nav-group-label">Layers</span>
+    <a href="#cache" class="idle">L1 Cache</a>
+    <a href="#lock" class="idle">L2 Lock</a>
+    <a href="#quota" class="idle">L3 Quota</a>
+    <a href="#batch" class="idle">L4 Batch</a>
+    <a href="#flow" class="idle">Request Flow</a>
+  </div>
+  <div class="nav-group">
+    <span class="nav-group-label">Deep Dive</span>
+    <a href="#decisions" class="idle">Decisions</a>
+    <a href="#nongoals" class="idle">Non-Goals</a>
+    <a href="#failures" class="idle">Failure Modes</a>
+    <a href="#upstream" class="idle">API Findings</a>
+    <a href="#verified" class="idle">Load &amp; Chaos Tests</a>
+    <a href="#files" class="idle">File Inventory</a>
+    <a href="#ai-usage" class="idle">Agent-First Workflow</a>
+  </div>
+</nav>
+</div>
+</div>
+
+<!-- ==================== Challenge ==================== -->
+<section id="challenge">
+<h2>The Challenge</h2>
+
+<div style="background:linear-gradient(135deg, #78350f50, #43140730); border:1px solid #f59e0b55; padding:20px 24px; border-radius:10px; margin:0 0 18px 0; color:#cbd5e1; font-style:italic;">
+  &ldquo;Our Data and AI team built a powerful model to handle this, but its inference process is <b style="color:#ef4444;">computationally expensive</b> to run. To make this product more cost-effective, we analyzed the model's output and found that a calculated room rate remains effective for up to 5 minutes.&rdquo;
+  <div style="font-style:normal; font-size:0.82rem; color:#64748b; margin-top:6px;">— Hospitality pricing scenario</div>
+</div>
+
+<div class="card blue">
+  <h4>What the constraint really means</h4>
+  <p>Every upstream call burns <b style="color:#ef4444;">expensive inference compute</b>. So I scoped the goal beyond &ldquo;stay under 1,000/day&rdquo;: <span class="highlight">minimise real calls</span>. Our service must serve <b>10,000+ requests/day</b> from this 1,000/day budget.</p>
+</div>
+
+<div class="card yellow">
+  <h4>Why cache alone isn't enough</h4>
+  <p>36 parameter combinations (4 periods &times; 3 hotels &times; 3 rooms) &times; 288 five-minute windows/day:</p>
+  <div class="math">36 &times; 288 = 10,368 possible cache misses/day</div>
+  <p>Way over the 1,000-call budget. We need <b>batch fetching</b> + <b>request coalescing</b> + a <b>hard quota cap</b>.</p>
+</div>
+</section>
+
+<!-- ==================== 4 Layers Funnel ==================== -->
+<section id="funnel">
+<h2>My Solution &mdash; 4 Layers of Protection</h2>
+
+<div style="background:linear-gradient(135deg, #064e3b50, #052e1630); border:1px solid #10b98155; padding:20px 24px; border-radius:10px; margin-bottom:18px;">
+  <div style="font-size:1.15rem; color:#10b981; font-weight:700; letter-spacing:0.3px; margin-bottom:8px;">
+    Lazy fallback + Bulk fetch &nbsp;&rarr;&nbsp; <span style="font-size:1.4rem;">0 ~ 288 calls / day</span>
+  </div>
+  <div style="color:#cbd5e1; line-height:1.55; font-size:0.97rem;">
+    <b>288</b> = math floor on the upper bound (24h &div; 5-min TTL, bulk fetch returns all 36 rates per call). <b style="color:#10b981;">0</b> = lazy lower bound (no upstream calls when nobody's asking). &nbsp;
+    <b style="color:#10b981;">Why not prewarming?</b> The spec calls inference <b style="color:#ef4444;">computationally expensive</b>, so spend should track real demand &mdash; prewarming burns a fixed 288/day even when zero clients are asking.
+  </div>
+  <div style="margin-top:12px; padding-top:12px; border-top:1px solid #10b98130; color:#cbd5e1; line-height:1.55; font-size:0.95rem;">
+    <b style="color:#10b981;">Hard ceiling:</b> 1,000/day enforced locally by <b>QuotaGuard</b> &mdash; holds even if the layers above break or upstream's own rate limiter misconfigures.
+  </div>
+</div>
+
+<div class="mechanisms-hero">
+  <div class="mechanisms-subtitle">My design funnels every request through 4 layers, top-to-bottom. Each layer blocks unnecessary API calls.</div>
+
+  <div class="funnel">
+    <div class="funnel-entry">
+      <span class="big">10,000+ requests/day</span>
+      incoming client traffic
+    </div>
+    <div class="funnel-arrow">&#9660;</div>
+
+    <div class="funnel-layer fl-cache">
+      <div class="funnel-layer-num">1</div>
+      <div class="funnel-layer-body">
+        <div class="funnel-layer-left">
+          <div class="funnel-layer-label">Cache</div>
+          <div class="funnel-layer-code">RateCache</div>
+        </div>
+        <div class="funnel-layer-right">
+          Same rate requested again within 5 min? Return from cache instantly.
+          <br><span class="funnel-layer-effect">most requests stop here</span>
+        </div>
+      </div>
+    </div>
+    <div class="funnel-arrow">&#9660; <span class="blocked">cache miss only</span></div>
+
+    <div class="funnel-layer fl-lock">
+      <div class="funnel-layer-num">2</div>
+      <div class="funnel-layer-body">
+        <div class="funnel-layer-left">
+          <div class="funnel-layer-label">Thundering Herd Protection</div>
+          <div class="funnel-layer-code">LockAndFetchRate</div>
+        </div>
+        <div class="funnel-layer-right">
+          100 requests miss cache at the same time? Only 1 leader proceeds, 99 wait.
+          <br><span class="funnel-layer-effect">N concurrent misses &rarr; 1 API call</span>
+        </div>
+      </div>
+    </div>
+    <div class="funnel-arrow">&#9660; <span class="blocked">leader only</span></div>
+
+    <div class="funnel-layer fl-quota">
+      <div class="funnel-layer-num">3</div>
+      <div class="funnel-layer-body">
+        <div class="funnel-layer-left">
+          <div class="funnel-layer-label">Quota Guard</div>
+          <div class="funnel-layer-code">QuotaGuard</div>
+        </div>
+        <div class="funnel-layer-right">
+          Atomic counter — if today's calls already hit 1,000, reject with 429 + Retry-After.
+          <br><span class="funnel-layer-effect">hard ceiling, no race condition</span>
+        </div>
+      </div>
+    </div>
+    <div class="funnel-arrow">&#9660; <span class="blocked">under quota</span></div>
+
+    <div class="funnel-layer fl-batch">
+      <div class="funnel-layer-num">4</div>
+      <div class="funnel-layer-body">
+        <div class="funnel-layer-left">
+          <div class="funnel-layer-label">Batch Fetch</div>
+          <div class="funnel-layer-code">RateApiClient.get_all_rates</div>
+        </div>
+        <div class="funnel-layer-right">
+          Fetch all 36 rate combinations in 1 API call &rarr; fill entire cache at once.
+          <br><span class="funnel-layer-effect">1 quota unit = 36 cached rates</span>
+        </div>
+      </div>
+    </div>
+    <div class="funnel-arrow">&#9660;</div>
+
+    <div class="funnel-entry">
+      <span class="big" style="color: #10b981;">0 ~ 288 API calls/day</span>
+      theoretical minimum achieved
+    </div>
+  </div>
+  <div class="mechanisms-result">
+    <span class="result-label">Quota efficiency:</span>
+    <span class="result-number">0 ~ 288</span>
+    <span class="result-unit">calls/day</span>
+    <span class="result-context">(theoretical minimum under 5-min TTL = 288 &nbsp;|&nbsp; budget = 1,000)</span>
+  </div>
+</div>
+</section>
+
+<!-- ==================== Architecture ==================== -->
+<section id="architecture">
+<h2>Architecture</h2>
+
+<p style="color:#94a3b8; margin-bottom:18px;">The full picture: client → Rails app (4 layers) → Redis + upstream. Each layer is detailed in its own section below.</p>
+
+<img src="architecture.jpg" alt="System architecture diagram" style="width:100%; max-width:100%; height:auto; border-radius:10px; border:1px solid #334155; margin-bottom:20px;">
+
+<div class="card blue" style="margin-top:18px;">
+  <h4>Deployment note &mdash; <span style="color:#f59e0b;">single Redis instance</span> assumption</h4>
+  <p>The implementation assumes a <b style="color:#f59e0b;">single Redis instance</b>. Under Sentinel / Cluster HA, the <code>LockAndFetchRate</code> SETNX can be lost during primary failover &mdash; a brief window where two leaders may exist.</p>
+  <p style="margin-top:8px;">For production HA, the standard answer is a consensus-backed coordinator like <b>etcd</b>, <b>Consul</b>, or <b>ZooKeeper</b> (Raft/Paxos under the hood). <b>Redlock</b> improves on a single Redis but has known safety issues under clock skew or GC pauses, as discussed in <a href="https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html" target="_blank" style="color:#38bdf8;">Martin Kleppmann's distributed-locking analysis</a>. The atomic <code>QuotaGuard</code> counter is a second line of defence &mdash; even if two leaders briefly co-exist, the daily upstream cap still holds.</p>
+</div>
+</section>
+
+<!-- ==================== Quick Start ==================== -->
+<section id="quickstart">
+<h2>Quick Start</h2>
+
+<div class="cmd">
+<span class="comment"># 1. Build &amp; run the whole stack (app + rate-api + redis)</span>
+<div class="cmd-line"><span class="prompt">$ </span><code>docker compose up -d --build</code><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div>
+<br><span class="comment"># 2. Sanity check</span>
+<div class="cmd-line"><span class="prompt">$ </span><code>curl 'http://localhost:3000/api/v1/pricing?period=Summer&amp;hotel=FloatingPointResort&amp;room=SingletonRoom'</code><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div>
+<br><span class="comment"># 3. Run unit tests</span>
+<div class="cmd-line"><span class="prompt">$ </span><code>docker compose exec app ./bin/rails test</code><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div>
+<br><span class="comment"># 4. Run a single test file</span>
+<div class="cmd-line"><span class="prompt">$ </span><code>docker compose exec app ./bin/rails test test/services/rate_cache_test.rb</code><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div>
+<br><span class="comment"># 5. Run load &amp; chaos tests against the live stack (~1 min smoke / ~6 min full)</span>
+<div class="cmd-line"><span class="prompt">$ </span><code>brew install wrk &amp;&amp; cd load_test &amp;&amp; chmod +x *.sh &amp;&amp; DURATION=30s ./run_all.sh</code><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div>
+<br><span class="comment"># 6. Characterise upstream API behaviour (sends up to 1,100 calls — burns daily quota!)</span>
+<div class="cmd-line"><span class="prompt">$ </span><code>docker compose exec app ruby upstream_test.rb bulk</code><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div>
+</div>
+<p style="font-size:0.85rem; color:#64748b; margin-top:8px;">
+  <b>Step 5</b> validates four behavioural invariants against the running stack — see <a href="#verified">Load &amp; Chaos Tests</a>. Full reference in <code>load_test/README.md</code>.
+  <br>
+  <b>Step 6</b> is how the upstream findings on this page were generated — see <a href="upstream_behavior.html">API Findings</a>.
+</p>
+
+</section>
+
+<!-- ==================== Layer 1: RateCache ==================== -->
+<section id="cache">
+<h2>Layer 1: Cache</h2>
+<p style="color: #64748b; font-size: 0.88rem; margin-top: -8px;"><code>app/services/rate_cache.rb</code></p>
+
+<div class="card green">
+  <h4>Background</h4>
+  <p>The upstream API is expensive (1,000 calls/day). The same <code>(period, hotel, room)</code> returns the same rate for a while.</p>
+</div>
+<div class="card red">
+  <h4>Problem</h4>
+  <p>Without caching, every request triggers an upstream call. At 10,000 requests/day we'd blow through the quota very fast.</p>
+</div>
+<div class="card blue">
+  <h4>Solution</h4>
+  <p>Cache each rate by <code>(period, hotel, room)</code> with a <span class="highlight">5-minute TTL</span>. Within that window, all requests for the same combo are served from cache &mdash; zero upstream calls.</p>
+  <pre>cache key: <span class="string">"pricing:Summer:FloatingPointResort:SingletonRoom"</span>
+TTL: <span class="number">5 minutes</span>
+Total keys: <span class="number">36</span> (4 periods &times; 3 hotels &times; 3 rooms)</pre>
+</div>
+</section>
+
+<!-- ==================== Layer 2: LockAndFetchRate ==================== -->
+<section id="lock">
+<h2>Layer 2: Thundering Herd Protection</h2>
+<p style="color: #64748b; font-size: 0.88rem; margin-top: -8px;"><code>app/services/lock_and_fetch_rate.rb</code></p>
+
+<div class="card green">
+  <h4>Background</h4>
+  <p>Cache entries expire every 5 minutes. At the moment of expiry, many requests can arrive at the same time and all see a cache miss.</p>
+</div>
+<div class="card red">
+  <h4>Problem</h4>
+  <p>Without coordination, every concurrent cache-miss request calls upstream independently. A burst of 50 requests burns 50 quota units instead of 1.</p>
+</div>
+<div class="card blue">
+  <h4>Solution</h4>
+  <p>Use a Redis lock (<code>SET NX</code>) with a <b>global</b> lock key (<code>lock_and_fetch_rate:pricing:bulk_fetch</code>) to elect one &ldquo;leader&rdquo;. The leader calls upstream and fills all 36 cache entries. All &ldquo;followers&rdquo; wait and read from the freshly populated cache.</p>
+  <div class="math">50 simultaneous requests = 1 upstream call = 1 quota unit = 36 cached rates</div>
+</div>
+
+<h3 id="timing-chain">Timing Chain Design</h3>
+<p>Three values form a chain — each depends on the previous:</p>
+
+<div class="timing">
+  <div class="timing-box t1">5s<span class="label">UPSTREAM_TIMEOUT</span></div>
+  <div class="timing-arrow">&rarr; +1s &rarr;</div>
+  <div class="timing-box t2">6s<span class="label">FOLLOWER_TIMEOUT</span></div>
+  <div class="timing-arrow">&rarr; +1s &rarr;</div>
+  <div class="timing-box t3">7s<span class="label">LOCK_AUTO_EXPIRE</span></div>
+</div>
+
+<div class="card blue">
+  <h4>UPSTREAM_TIMEOUT (5s) — defined in RateApiClient</h4>
+  <p>Without a timeout, if upstream hangs, the request blocks forever and ties up a Puma worker. 5s gives upstream enough time to respond normally, but frees the worker quickly when upstream is down.</p>
+</div>
+<div class="card yellow">
+  <h4>FOLLOWER_TIMEOUT (6s) — why not exactly 5s?</h4>
+  <p>The leader could get the upstream response at 4.9s, write cache, but the follower already gave up at 5.0s — wasted the whole wait. The 1s buffer covers this edge case.</p>
+</div>
+<div class="card purple">
+  <h4>LOCK_AUTO_EXPIRE (7s) — safety net</h4>
+  <p>Normally <code>ensure</code> deletes the lock right away after the leader finishes. But if the process crashes hard (e.g. <code>kill -9</code>), <code>ensure</code> never runs and the lock is stuck. 7s auto-expire is the safety net.</p>
+  <p>It must be longer than FOLLOWER_TIMEOUT (6s). If shorter, the lock expires while followers are still waiting &rarr; a new request grabs the lock &rarr; becomes a second leader &rarr; calls upstream again &rarr; wastes quota.</p>
+</div>
+<div class="card green">
+  <h4>FOLLOWER_POLL_INTERVAL (50ms)</h4>
+  <p>1ms = too fast, floods Redis. 1s = too slow, follower waits up to 1s after leader finishes. 50ms = good balance. At most 50ms extra latency.</p>
+</div>
+
+<div style="text-align:center;"><a href="lock_and_fetch_rate_demo.html" class="demo-link">Open Interactive Demo &rarr;</a></div>
+</section>
+
+<!-- ==================== Layer 3: QuotaGuard ==================== -->
+<section id="quota">
+<h2>Layer 3: Quota Guard</h2>
+<p style="color: #64748b; font-size: 0.88rem; margin-top: -8px;"><code>app/services/quota_guard.rb</code></p>
+
+<div class="card green">
+  <h4>Background &mdash; a fast-fail tripwire</h4>
+  <p>With Batch Fetch, the theoretical maximum is only 288 calls/day &mdash; well under the 1,000 budget. Under normal operation, QuotaGuard will <b>never trigger</b>. It exists as a <b>local tripwire</b> for scenarios that shouldn't happen but could &mdash; bugs that turn every cache miss into an upstream call:</p>
+  <ul style="margin: 8px 0 12px 20px; font-size: 0.95rem; line-height: 1.8;">
+    <li><b>Upstream changes response format</b> &mdash; e.g. upstream renames <code>rate</code> to <code>price</code>. Parser fails, cache stays empty, every request hits upstream until upstream itself starts rejecting.</li>
+    <li><b>Bug in cache write</b> &mdash; e.g. <code>RateCache.write_all</code> has a typo in the key name. Writes succeed silently but reads never match &rarr; same runaway loop.</li>
+  </ul>
+  <p>Normally the 1,001st call is rejected up front with 429 &mdash; upstream never runs the expensive inference for it. But if that limiter ever misconfigures (bug, redeploy, staging quirk), our overflow would actually hit the <b style="color:#ef4444;">computationally expensive</b> inference and burn real compute. <b>QuotaGuard keeps us honest to the 1,000/day contract <span style="color:#f59e0b;">regardless of upstream's enforcement state</span>.</b></p>
+  <div style="background:#1e293b40; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:0 6px 6px 0; margin-top:8px;">
+    <p style="margin:0 0 6px;"><b style="color:#f59e0b;">Trade-offs accepted:</b></p>
+    <ul style="margin:0 0 0 18px; font-size:0.95rem;">
+      <li><b>Duplicated state</b> &mdash; the cap is enforced in two places (upstream &amp; here). If upstream relaxes to 2,000, <code>DAILY_LIMIT</code> needs updating too.</li>
+      <li><b>Added complexity</b> &mdash; ~50 lines of code + tests + a Redis dependency for a layer that should never trigger in normal operation. A minimalist approach would skip QuotaGuard and trust upstream's own 429, accepting the small latency / observability cost.</li>
+    </ul>
+  </div>
+</div>
+<div class="card red">
+  <h4>Problem</h4>
+  <p>Multiple Puma workers handle requests in parallel. A naive &ldquo;read &rarr; check &rarr; increment&rdquo; has a race condition: two workers could both read 999, both pass the check, and both call upstream.</p>
+  <pre><span class="comment">// Race condition example:</span>
+Worker A: read count &rarr; <span class="number">999</span> &rarr; passes check &rarr; calls upstream   <span class="comment">// count is now 1000</span>
+Worker B: read count &rarr; <span class="number">999</span> &rarr; passes check &rarr; calls upstream   <span class="comment">// EXCEEDED!</span></pre>
+</div>
+<div class="card blue">
+  <h4>Solution</h4>
+  <p>Redis <code>INCR</code> is atomic &mdash; it increments and returns the new value in one step. Each request gets a unique sequential number. Exactly 1,000 calls pass through. No race condition.</p>
+  <pre>daily key: <span class="string">"quota:2026-04-22"</span>    <span class="comment">// auto-expires at midnight</span>
+Redis INCR &rarr; <span class="number">1000</span> &rarr; pass &#10003;
+Redis INCR &rarr; <span class="number">1001</span> &rarr; raise ExhaustedError &#10007;</pre>
+</div>
+
+<div class="card yellow">
+  <h4>Why 1,000 and not 900?</h4>
+  <p>Because INCR is atomic, there's no way to overshoot. A lower buffer only makes sense with a gradual slowdown strategy. We use a hard stop with <code>Retry-After</code> until midnight, so capping lower just wastes quota.</p>
+</div>
+
+<div class="card red">
+  <h4>Assumption: quota resets at UTC midnight</h4>
+  <p>The upstream the upstream rate API documentation does not specify when the daily quota resets. This implementation assumes <b>UTC midnight</b> &mdash; the Redis key uses <code>quota:YYYY-MM-DD</code> (UTC) and the <code>Retry-After</code> header counts seconds until UTC 00:00. If the actual reset time differs, only the key date logic and Retry-After calculation need to change.</p>
+</div>
+</section>
+
+<!-- ==================== Layer 4: Batch Fetch ==================== -->
+<section id="batch">
+<h2>Layer 4: Batch Fetch</h2>
+<p style="color: #64748b; font-size: 0.88rem; margin-top: -8px;"><code>lib/rate_api_client.rb</code> &rarr; <code>get_all_rates</code></p>
+
+<div class="card green">
+  <h4>Background</h4>
+  <p>The upstream API accepts multiple rate queries in a single request. There are 36 possible combinations (4 periods &times; 3 hotels &times; 3 rooms).</p>
+</div>
+<div class="card red">
+  <h4>Problem</h4>
+  <p>Without batching, each cache miss fetches only one rate &mdash; one quota unit per rate. Even with LockAndFetchRate, the worst case is 36 cache misses &times; 288 windows = 10,368 calls/day.</p>
+</div>
+<div class="card blue">
+  <h4>Solution</h4>
+  <p>On any cache miss, fetch <b>all 36 rates</b> in a single API call via <code>RateApiClient.get_all_rates</code>. Then <code>RateCache.write_all</code> fills every cache key at once. One quota unit refreshes the entire cache for the next 5 minutes.</p>
+  <div class="math">1 API call &rarr; 36 cache entries &rarr; 5 minutes of full coverage</div>
+</div>
+
+<div class="comparison">
+  <div class="side before">
+    <h4>Without Batch</h4>
+    <pre>Cache miss for <span class="string">"Summer:FloatingPointResort:SingletonRoom"</span>
+  &rarr; fetch <span class="number">1</span> rate
+  &rarr; write <span class="number">1</span> cache entry
+  &rarr; <span class="number">1</span> quota unit for <span class="number">1</span> rate</pre>
+    <p style="font-size:0.95rem;">Worst case: <span style="color:#ef4444; font-weight:600;">10,368 calls/day</span></p>
+  </div>
+  <div class="side after">
+    <h4>With Batch</h4>
+    <pre>Cache miss for <span class="string">"Summer:FloatingPointResort:SingletonRoom"</span>
+  &rarr; fetch <span class="number">36</span> rates (all combos)
+  &rarr; write <span class="number">36</span> cache entries
+  &rarr; <span class="number">1</span> quota unit for <span class="number">36</span> rates</pre>
+    <p style="font-size:0.95rem;">Worst case: <span style="color:#10b981; font-weight:600;">288 calls/day</span> (= theoretical minimum)</p>
+  </div>
+</div>
+</section>
+
+<!-- ==================== Request Flow ==================== -->
+<section id="flow">
+<h2>Request Flow</h2>
+
+<div class="flow">
+  <div class="flow-step controller">
+    <b>PricingController</b>
+    <div class="detail">Validate params &rarr; 400 if invalid; render service errors with proper status (429, 502, 504)</div>
+  </div>
+  <div class="flow-arrow">&#9660;</div>
+  <div class="flow-step service">
+    <b>PricingService</b>
+    <div class="detail">Orchestrates the full flow, maps errors to HTTP status codes</div>
+  </div>
+  <div class="flow-arrow">&#9660;</div>
+  <div class="flow-step cache">
+    <b>&oplus; RateCache.read</b>
+    <div class="detail">Cache hit? &rarr; return immediately, skip everything below</div>
+  </div>
+  <div class="flow-arrow">&#9660; cache miss</div>
+  <div class="flow-step lock">
+    <b>&oplus; LockAndFetchRate.call</b>
+    <div class="detail">Grab Redis lock &rarr; only one request proceeds (leader), others wait (followers)</div>
+  </div>
+  <div class="flow-arrow">&#9660; leader only</div>
+  <div class="flow-step quota">
+    <b>&oplus; QuotaGuard.consume_quota!</b>
+    <div class="detail">Atomic Redis INCR &mdash; if count > 1,000, raise ExhaustedError</div>
+  </div>
+  <div class="flow-arrow">&#9660;</div>
+  <div class="flow-step api">
+    <b>&oplus; RateApiClient.get_all_rates</b>
+    <div class="detail">POST all 36 combinations in one request &rarr; 1 API call = 1 quota unit</div>
+  </div>
+  <div class="flow-arrow">&#9660;</div>
+  <div class="flow-step cache">
+    <b>&oplus; RateCache.write_all (36 rates)</b>
+    <div class="detail">Fill entire cache in one shot &rarr; all 36 keys get 5-min TTL</div>
+  </div>
+</div>
+
+</section>
+
+<!-- ==================== Design Decisions ==================== -->
+<section id="decisions">
+<h2>Design Decisions</h2>
+<p>Each decision lists the options considered, the choice, and the trade-off consciously accepted. Click to expand.</p>
+
+<div class="decision open" data-id="d1">
+  <div class="decision-header" onclick="toggleDecision(this)">
+    <div class="decision-num">1</div>
+    <div class="decision-title">When to fetch upstream <span style="color:#64748b; font-size:0.85rem; font-weight:400;">(Lazy vs Prewarming)</span></div>
+    <div class="decision-choice">Lazy on-demand</div>
+    <div class="decision-arrow">&#9656;</div>
+  </div>
+  <div class="decision-body">
+    <p>Bulk fetching itself isn't a real choice &mdash; the math forces it: 36 combos &times; 288 cache windows/day = <b>10,368 calls</b>, way over the 1,000 budget. So <i>each</i> upstream call has to return all 36 rates. Under a 5-min TTL, <b>288/day is the math floor on the upper bound</b> &mdash; no compliant design can do fewer at peak. The interesting question is <b>when</b> to trigger that call: on the first cache miss (lazy &mdash; <b style="color:#10b981;">0 at the lower bound</b>), or on a schedule (prewarming &mdash; always &ge; 288).</p>
+    <table>
+      <thead><tr><th>Option</th><th>Behaviour</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Periodic prewarming<br><span style="font-size:0.82rem; color:#94a3b8;">e.g. Sidekiq cron every 4 min</span></td>
+          <td>Cache always warm, every request is instant. <b>But:</b> burns <b>360 calls/day</b> even at zero traffic; needs extra infra (Sidekiq + scheduler).</td>
+        </tr>
+        <tr>
+          <td><b>Lazy on-demand</b> &#10003;</td>
+          <td><b style="color:#f59e0b;">Upstream cost proportional to actual demand</b> &mdash; 0 calls when nobody's asking, up to 288/day at full traffic. No extra infra.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p><b>Why lazy fits this workload:</b></p>
+    <ul style="margin:6px 0 8px 20px;">
+      <li>Spec frames upstream as <b style="color:#ef4444;">computationally expensive</b> &mdash; we want to burn quota only when there's real demand</li>
+      <li>Hospitality traffic is uneven (peak season, rush hours, dead hours); lazy adapts naturally</li>
+      <li>Tight 1,000/day budget rewards proportional usage; prewarming's fixed 360/day leaves no room if traffic spikes break the cache math</li>
+    </ul>
+    <p style="background:#1e293b40; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:0 6px 6px 0; margin-top:8px;"><b style="color:#f59e0b;">Prewarming is the right call when:</b> traffic is predictable and steady, latency SLAs are strict (any cache miss is unacceptable), or the quota budget is generous. For those workloads, prewarming wins. Different constraint, different answer.</p>
+    <p><b>Trade-off accepted:</b> the first user to hit an expired cache pays a small latency tax (waits for the upstream call). All subsequent requests in that 5-min window are instant cache hits.</p>
+  </div>
+</div>
+
+<div class="decision" data-id="d2">
+  <div class="decision-header" onclick="toggleDecision(this)">
+    <div class="decision-num">2</div>
+    <div class="decision-title">Shared cache backend <span style="color:#64748b; font-size:0.85rem; font-weight:400;">(L1–L3)</span></div>
+    <div class="decision-choice">Redis</div>
+    <div class="decision-arrow">&#9656;</div>
+  </div>
+  <div class="decision-body">
+    <table>
+      <thead><tr><th>Option</th><th>Rejected because</th></tr></thead>
+      <tbody>
+        <tr><td><code>MemoryStore</code></td><td>Per-Puma-worker memory — hit ratio divided by worker count, breaks 10:1 requirement.</td></tr>
+        <tr><td><code>SolidCache</code></td><td>SQLite-based; no atomic <code>INCR</code> for quota; row-level lock contention.</td></tr>
+        <tr><td><b>Redis</b> &#10003;</td><td>Cross-worker sharing; atomic primitives (<code>SET NX</code>, <code>INCR</code>, <code>EXPIREAT</code>) solve cache, lock, and quota with one dependency.</td></tr>
+      </tbody>
+    </table>
+    <p><b>Trade-off:</b> one extra service in <code>docker-compose.yml</code>. Worth it — Redis is ubiquitous in Rails production.</p>
+  </div>
+</div>
+
+<div class="decision" data-id="d3">
+  <div class="decision-header" onclick="toggleDecision(this)">
+    <div class="decision-num">3</div>
+    <div class="decision-title">Thundering herd protection <span style="color:#64748b; font-size:0.85rem; font-weight:400;">(L2 Lock)</span></div>
+    <div class="decision-choice">Redis SET NX lock</div>
+    <div class="decision-arrow">&#9656;</div>
+  </div>
+  <div class="decision-body">
+    <p>Without coalescing, a 50-request burst burns 50 units of the daily budget in milliseconds. Redis <code>SET NX</code> elects one leader across all Puma workers; followers poll the cache.</p>
+
+    <pre><span class="comment">// LockAndFetchRate pseudocode:</span>
+token = SecureRandom.uuid                              <span class="comment">// per-leader fencing token</span>
+<span class="keyword">if</span> SET NX <span class="string">"lock:bulk_fetch"</span> = token (TTL 7s) &rarr; leader
+   yield                                              <span class="comment">// fetch upstream, write cache</span>
+   Lua: <span class="keyword">if</span> GET == token <span class="keyword">then</span> DEL          <span class="comment">// release only if still ours</span>
+<span class="keyword">else</span> &rarr; follower: poll cache every 50ms up to 6s</pre>
+
+    <p><b style="color:#f59e0b;">Fencing token:</b> each leader holds a unique UUID. On release, a Lua script checks "still mine?" before deleting &mdash; otherwise a slow leader could wipe the new leader's lock and let a third request slip in.</p>
+
+    <p style="background:#1e293b40; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:0 6px 6px 0; margin-top:8px;"><b style="color:#f59e0b;">Single-Redis assumption:</b> under Sentinel / Cluster HA, primary failover can briefly produce two leaders. Production HA wants a Raft-based coordinator (etcd / Consul). QuotaGuard's atomic counter is a second line of defence &mdash; even if two leaders co-exist briefly, the daily cap still holds.</p>
+  </div>
+</div>
+
+<div class="decision" data-id="d4">
+  <div class="decision-header" onclick="toggleDecision(this)">
+    <div class="decision-num">4</div>
+    <div class="decision-title">Quota protection <span style="color:#64748b; font-size:0.85rem; font-weight:400;">(L3 Quota)</span></div>
+    <div class="decision-choice">Redis atomic counter</div>
+    <div class="decision-arrow">&#9656;</div>
+  </div>
+  <div class="decision-body">
+    <p>The upstream limit is 1,000 calls per day &mdash; not per second. So we need a simple counter that resets at midnight.</p>
+
+    <h5 style="color:#94a3b8; text-transform:uppercase; font-size:0.78rem; letter-spacing:0.08em; margin:18px 0 6px;">Why this layer exists</h5>
+    <p>Batch Fetch already keeps the theoretical max at <b>288 calls/day</b> &mdash; well under budget. Under normal operation, QuotaGuard never triggers.</p>
+    <p>The honest remaining value is <b style="color:#f59e0b;">defensive client behavior</b>: we cap our own call rate at 1,000/day even if upstream's own rate limiter fails to enforce it (bug, redeploy, staging quirk). In that edge case our overflow would otherwise hit upstream's <b style="color:#ef4444;">computationally expensive</b> inference and burn real compute. QuotaGuard prevents that.</p>
+    <div style="background:#1e293b40; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:0 6px 6px 0; margin-top:8px;">
+      <p style="margin:0 0 6px;"><b style="color:#f59e0b;">Trade-offs accepted:</b></p>
+      <ul style="margin:0 0 0 18px; font-size:0.95rem;">
+        <li><b>Duplicated state</b> &mdash; the cap is enforced in two places (upstream &amp; here). If upstream relaxes to 2,000, <code>DAILY_LIMIT</code> needs updating too.</li>
+        <li><b>Added complexity</b> &mdash; ~50 lines of code + tests + a Redis dependency for a layer that should never trigger in normal operation. A minimalist approach would skip QuotaGuard and trust upstream's own 429, accepting the small latency / observability cost.</li>
+      </ul>
+    </div>
+
+    <h5 style="color:#94a3b8; text-transform:uppercase; font-size:0.78rem; letter-spacing:0.08em; margin:18px 0 6px;">Why Redis</h5>
+    <p>The counter must be shared across all Puma workers (separate processes), and <code>INCR</code> is atomic &mdash; it increments and returns the new value in one step, so two workers can never both read 999 and both pass the check.</p>
+
+    <h5 style="color:#94a3b8; text-transform:uppercase; font-size:0.78rem; letter-spacing:0.08em; margin:18px 0 6px;">Implementation</h5>
+    <ul style="margin:6px 0 8px 20px;">
+      <li><code>INCR</code> on <code>quota:YYYY-MM-DD</code> &mdash; atomic, cross-worker</li>
+      <li>Runs only on cache misses inside the lock &mdash; cached responses never touch the counter</li>
+      <li>Cap is exactly 1,000 (not lower) because <code>INCR</code> is atomic &mdash; no way to overshoot</li>
+    </ul>
+
+    <h5 style="color:#94a3b8; text-transform:uppercase; font-size:0.78rem; letter-spacing:0.08em; margin:18px 0 6px;">Hardening</h5>
+    <ul style="margin:6px 0 8px 20px;">
+      <li><b>Counter survives restart</b> &mdash; Redis AOF persistence + persistent volume. Without this, a Redis restart wipes the counter and the cap could be exceeded across restarts.</li>
+      <li><b>Refund never goes negative</b> &mdash; <code>refund_quota!</code> wraps DECR in a Lua script that only runs when counter is above zero. Without this, burst 401s before any INCR would push counter negative, letting subsequent INCRs silently exceed 1,000.</li>
+    </ul>
+
+    <h5 style="color:#94a3b8; text-transform:uppercase; font-size:0.78rem; letter-spacing:0.08em; margin:18px 0 6px;">Assumption</h5>
+    <p>Quota resets at <span class="highlight">UTC midnight</span>. The upstream docs don't specify when the daily limit resets, so we assume UTC 00:00. The Redis key uses <code>quota:YYYY-MM-DD</code> (UTC) and <code>Retry-After</code> counts seconds until UTC midnight. If the actual reset time differs, only these two values need updating.</p>
+  </div>
+</div>
+
+<div class="decision" data-id="d5">
+  <div class="decision-header" onclick="toggleDecision(this)">
+    <div class="decision-num">5</div>
+    <div class="decision-title">Failure strategy</div>
+    <div class="decision-choice">Fail-closed</div>
+    <div class="decision-arrow">&#9656;</div>
+  </div>
+  <div class="decision-body">
+    <p>When a dependency dies (Redis, upstream, lock), what should the service do? There are four common strategies — each with a different priority.</p>
+
+    <table style="margin: 14px 0;">
+      <thead>
+        <tr><th>Strategy</th><th>What it does</th><th>Protects</th><th>Sacrifices</th></tr>
+      </thead>
+      <tbody>
+        <tr style="background:#10b98115;">
+          <td><b style="color:#10b981;">✓ Fail-closed</b><br><span style="font-size:0.82rem; color:#94a3b8;">My choice</span></td>
+          <td>Dependency dies → return 5xx, never call upstream</td>
+          <td>Upstream contract (1000/day cap)</td>
+          <td>Own service uptime</td>
+        </tr>
+        <tr>
+          <td>Fail-open</td>
+          <td>Dependency dies → bypass protection, hit upstream directly</td>
+          <td>Own uptime</td>
+          <td>Quota burns fast; thundering herd unblocked</td>
+        </tr>
+        <tr>
+          <td>Graceful degradation</td>
+          <td>Return stale cache, default value, or partial response</td>
+          <td>User experience</td>
+          <td>Data freshness / correctness</td>
+        </tr>
+        <tr>
+          <td>Fail-fast + retry</td>
+          <td>Return 5xx, expect client to retry with backoff</td>
+          <td>Same as fail-closed but pushes retry to caller</td>
+          <td>Assumes well-behaved client</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><b>Why fail-closed for this service:</b> two spec rules forced it.</p>
+    <ol style="margin-left:20px;">
+      <li><b>"Rate must be no older than 5 minutes"</b> → can't return stale data → rules out graceful degradation.</li>
+      <li><b>"1,000 calls/day per token" (hard contract)</b> → can't let failures leak through to upstream → rules out fail-open.</li>
+    </ol>
+    <p>Once those two are eliminated, fail-closed is the only honest choice. Fail-fast + retry is functionally equivalent but offloads correctness to the client; for a proxy, owning that responsibility is cleaner.</p>
+
+    <p><b>When I'd choose differently:</b></p>
+    <ul style="margin-left:20px;">
+      <li><b>Recommendation API</b> — graceful degradation. Returning popular items is better than no items.</li>
+      <li><b>Like / view counter</b> — fail-open. A few extra writes is harmless.</li>
+      <li><b>Internal analytics dashboard</b> — fail-open with a banner. Operators can judge stale data themselves.</li>
+    </ul>
+    <p>The right choice always depends on whether <b>"wrong data" or "no data" is more harmful</b>. For pricing, wrong data wins.</p>
+  </div>
+</div>
+
+<div class="decision" data-id="d6">
+  <div class="decision-header" onclick="toggleDecision(this)">
+    <div class="decision-num">6</div>
+    <div class="decision-title">Error handling</div>
+    <div class="decision-choice">Distinct HTTP status per failure</div>
+    <div class="decision-arrow">&#9656;</div>
+  </div>
+  <div class="decision-body">
+
+    <div class="comparison">
+      <div class="side before">
+        <h4>&#10007; Before</h4>
+        <p style="font-size:0.92rem;">Every upstream failure — 401, 5xx, timeout — returned <code>400 Bad Request</code>. The client had no way to distinguish a bad request from a server-side failure.</p>
+      </div>
+      <div class="side after">
+        <h4>&#10003; After</h4>
+        <p style="font-size:0.92rem;">Each failure maps to a distinct HTTP status. The client knows exactly what happened and whether to fix the request, retry, or escalate.</p>
+      </div>
+    </div>
+
+    <div class="finding info" style="margin-bottom:18px;">
+      <div class="finding-title">Why this matters — upstream has high failure rates</div>
+      <div class="finding-row"><span class="finding-label">~7%</span><span class="finding-value">HTTP 500 from upstream</span></div>
+      <div class="finding-row"><span class="finding-label">~7%</span><span class="finding-value">Timeout</span></div>
+      <div class="finding-row"><span class="finding-label">~7%</span><span class="finding-value">HTTP 200 with error body <code style="font-size:0.82rem;">{"message":"Failed to process rates...","status":"error"}</code></span></div>
+      <div class="finding-row"><span class="finding-label">~7%</span><span class="finding-value">HTTP 200 with <code>rate</code> field missing from response</span></div>
+      <p style="margin-top:10px; margin-bottom:0; font-size:0.88rem; color:#64748b;">From 1,001 live test calls — see <code>UPSTREAM_BEHAVIOR.md</code> for full pattern tables.</p>
+    </div>
+
+    <p><span style="display:inline-block; background:#38bdf820; color:#38bdf8; border:1px solid #38bdf8; border-radius:5px; padding:2px 12px; font-weight:700; font-size:0.95rem; letter-spacing:0.03em;">Anti-Corruption Layer (ACL)</span> &nbsp;<code>RateApiClient</code> absorbs all upstream quirks and exposes a clean typed interface. <code>PricingService</code> never touches a raw HTTP response:</p>
+
+    <div class="flow" style="margin: 18px 0;">
+
+      <!-- Chaos zone -->
+      <div style="background:#ef444420; border:2px solid #ef4444; border-radius:8px; padding:14px 24px; text-align:center; min-width:400px;">
+        <div style="font-size:0.72rem; color:#ef444490; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px;">&#9888; unstable, unpredictable</div>
+        <div style="font-size:1rem; font-weight:700; color:#ef4444;">upstream rate-api</div>
+        <div class="detail" style="color:#ef444480;">runs expensive ML inference; ~28% failure rate — 5xx &nbsp;·&nbsp; timeout &nbsp;·&nbsp; HTTP 200 with error body &nbsp;·&nbsp; HTTP 200 with missing rate field</div>
+      </div>
+
+      <div class="flow-arrow">&#9660;</div>
+
+      <!-- RateApiClient — the star, IS the ACL -->
+      <div style="background:#38bdf818; border:2px solid #38bdf8; border-radius:8px; padding:14px 24px; text-align:center; min-width:400px; box-shadow:0 0 18px #38bdf825;">
+        <div style="margin-bottom:8px;"><span style="font-size:0.88rem; font-weight:800; color:#38bdf8; background:#0f172a; border:2px solid #38bdf8; border-radius:5px; padding:4px 14px; letter-spacing:0.06em; box-shadow:0 0 10px #38bdf850;">Anti-Corruption Layer</span></div>
+        <div style="font-size:1.05rem; font-weight:800; color:#38bdf8;">RateApiClient</div>
+        <div class="detail" style="color:#38bdf8cc; margin-bottom:4px;">makes HTTP call &nbsp;·&nbsp; parses response &nbsp;·&nbsp; returns clean <code style="color:#38bdf8;">Integer</code> on success</div>
+        <div class="detail"><span style="color:#38bdf880;">any failure → typed exception: UnauthorizedError &nbsp;·&nbsp; QuotaExhaustedError &nbsp;·&nbsp; TimeoutError &nbsp;·&nbsp; UpstreamError</span></div>
+      </div>
+
+      <div class="flow-arrow">&#9660;</div>
+
+      <!-- PricingService — secondary -->
+      <div style="background:#1e293b; border:1px solid #334155; border-radius:8px; padding:12px 24px; text-align:center; min-width:400px;">
+        <div style="font-size:0.95rem; font-weight:600; color:#94a3b8;">PricingService</div>
+        <div class="detail" style="color:#64748b;">orchestrates cache → lock → quota → fetch; never touches raw HTTP; catches each typed exception and assembles the correct HTTP status + client message</div>
+      </div>
+
+      <div class="flow-arrow" style="color:#475569;">&#9660;</div>
+
+      <div style="background:#1e293b; border:1px solid #334155; border-radius:8px; padding:12px 24px; text-align:center; min-width:400px;">
+        <div style="font-size:0.95rem; font-weight:600; color:#94a3b8;">Controller</div>
+        <div class="detail" style="color:#64748b;">validates params (period &nbsp;·&nbsp; hotel &nbsp;·&nbsp; room); renders the JSON response with status from PricingService</div>
+      </div>
+
+    </div>
+
+    <table>
+      <thead><tr><th>Situation</th><th>Who raises</th><th>Client status</th><th>Client message</th><th>Client action</th></tr></thead>
+      <tbody>
+        <tr><td>Invalid params</td><td>Controller</td><td><span class="status-badge s-400">400</span></td><td>Missing required parameters / Invalid period</td><td>Fix request</td></tr>
+        <tr><td>Daily quota used up</td><td>QuotaGuard</td><td><span class="status-badge s-429">429</span></td><td>Daily quota reached — requests resume at midnight UTC</td><td>Wait for Retry-After</td></tr>
+        <tr><td>Upstream returns HTTP 429 (token limit)</td><td>RateApiClient</td><td><span class="status-badge s-429">429</span></td><td>Upstream API quota exhausted — token limit reached</td><td>Wait for Retry-After</td></tr>
+        <tr><td>Bad token (401)</td><td>RateApiClient</td><td><span class="status-badge s-502">502</span></td><td>Upstream authentication failed</td><td>—</td></tr>
+        <tr><td>Upstream 200 with error body</td><td>RateApiClient</td><td><span class="status-badge s-502">502</span></td><td>Upstream error</td><td>—</td></tr>
+        <tr><td>Upstream 200, rate field absent</td><td>RateApiClient</td><td><span class="status-badge s-502">502</span></td><td>Upstream error</td><td>—</td></tr>
+        <tr><td>Upstream 5xx</td><td>RateApiClient</td><td><span class="status-badge s-502">502</span></td><td>Upstream error</td><td>—</td></tr>
+        <tr><td>Upstream timeout</td><td>RateApiClient</td><td><span class="status-badge s-504">504</span></td><td>Upstream timed out</td><td>—</td></tr>
+        <tr><td>Follower waited too long</td><td>LockAndFetchRate</td><td><span class="status-badge s-504">504</span></td><td>Request timed out waiting for upstream result</td><td>—</td></tr>
+        <tr><td>Unexpected error</td><td>StandardError catch-all</td><td><span class="status-badge s-500">500</span></td><td>Unexpected error</td><td>—</td></tr>
+      </tbody>
+    </table>
+    <p>Both 429 responses include a <code>Retry-After</code> header (seconds until UTC midnight). All other error responses return only the status code and message — no retry guidance is provided.</p>
+  </div>
+</div>
+
+<div class="decision" data-id="d7">
+  <div class="decision-header" onclick="toggleDecision(this)">
+    <div class="decision-num">7</div>
+    <div class="decision-title">Observability</div>
+    <div class="decision-choice">Lograge structured logs</div>
+    <div class="decision-arrow">&#9656;</div>
+  </div>
+  <div class="decision-body">
+    <p>Every request emits a single JSON log line with: <code>method</code>, <code>path</code>, <code>status</code>, <code>duration</code>, <code>cache_status</code> (<code>"hit"</code> or <code>"miss"</code>), and <code>upstream_latency_ms</code>.</p>
+    <pre><span class="comment">// Example log line:</span>
+{"method":"GET","path":"/api/v1/pricing","status":<span class="number">200</span>,"duration":<span class="number">12.3</span>,
+ "cache_status":"<span class="string">hit</span>","upstream_latency_ms":<span class="keyword">null</span>}</pre>
+    <p><b>Why Lograge over paid services (Datadog, New Relic):</b> Lograge is free, zero config, and ships with Rails. For a case study like this, structured JSON logs are enough to prove the observability mindset. In production, these same JSON lines can be piped into any log aggregator.</p>
+    <p><b>Why this matters:</b> "How would you know this service is healthy in production?" has a concrete answer — filter by <code>cache_status=miss</code>, watch <code>upstream_latency_ms</code>.</p>
+  </div>
+</div>
+
+<div class="decision" data-id="d8">
+  <div class="decision-header" onclick="toggleDecision(this)">
+    <div class="decision-num">8</div>
+    <div class="decision-title">Testing strategy</div>
+    <div class="decision-choice">WebMock</div>
+    <div class="decision-arrow">&#9656;</div>
+  </div>
+  <div class="decision-body">
+    <p>All test files follow a consistent section structure: <b>Happy path &rarr; Fail path &rarr; Edge/Boundary &rarr; Isolation</b>. Coverage measured with SimpleCov — currently <span class="highlight">100%</span> (scaffold files excluded).</p>
+    <p><b>Why WebMock over .stub:</b> Stubbing <code>RateApiClient.get_all_rates</code> directly bypasses the HTTP layer, hiding timeout, header, and retry behaviour. WebMock intercepts at the socket layer, producing more realistic tests.</p>
+  </div>
+</div>
+</section>
+
+<!-- ==================== Non-Goals ==================== -->
+<section id="nongoals">
+<h2>Non-Goals</h2>
+<p>These were considered and intentionally left out:</p>
+
+<div class="nongoal skip">
+  <div class="nongoal-icon">&#10005;</div>
+  <div class="nongoal-text"><strong>Code-level retry (retry_on)</strong><div class="nongoal-reason">The next user request becomes a new leader and tries again. That's enough — no need to retry inside the same call. See <a href="lock_and_fetch_rate_demo.html#recovery-chain"><b>Recovery Chain (3 leaders)</b> demo</a> for a visual walkthrough.</div></div>
+</div>
+<div class="nongoal skip">
+  <div class="nongoal-icon">&#10005;</div>
+  <div class="nongoal-text"><strong>Background pre-warming of hot keys</strong><div class="nongoal-reason">Without production traffic data, picking which keys to warm is guesswork and wastes quota.</div></div>
+</div>
+</section>
+
+<!-- ==================== Failure Modes ==================== -->
+<section id="failures">
+<h2>Failure Modes</h2>
+<p style="color:#94a3b8; margin-top:-8px; margin-bottom:18px;">What happens when each dependency fails, and why the 1000/day cap still holds.</p>
+
+<table>
+  <thead>
+    <tr><th>What fails</th><th>What happens inside</th><th>Client sees</th><th>Upstream impact</th><th>Recovery</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>Redis fully down</b><br><span style="font-size:0.82rem; color:#94a3b8;">e.g. crash, OOM, network partition</span></td>
+      <td>Rails' built-in cache error handler swallows the Redis error and returns nil &rarr; <code>Rails.cache.write(..., unless_exist: true)</code> returns nil &rarr; LockAndFetchRate falls into the follower branch &rarr; <code>poll_for_result</code> sees nil for 6s &rarr; raises <code>LockAndFetchRate::TimeoutError</code></td>
+      <td><span class="status-badge s-504">504</span> "Request timed out waiting for upstream result"</td>
+      <td><b style="color:#10b981;">0 calls</b> &mdash; no one acquires the lock, so upstream is never reached</td>
+      <td>Service recovers immediately when Redis comes back online (verified by the <a href="#verified">Fail-closed when Redis dies</a> test in Load &amp; Chaos Tests)</td>
+    </tr>
+    <tr>
+      <td><b>Redis restart</b><br><span style="font-size:0.82rem; color:#94a3b8;">e.g. deploy, OOM, container restart</span></td>
+      <td>AOF replays everything back — cache, lock, counter — with their original expiry times. Stale lock self-expires within 7s (same as leader crash); cache stays inside the 5-min freshness window; counter resumes counting. Up to ~1s of writes may be lost (<code>appendfsync everysec</code> default).</td>
+      <td>Brief unavailability during restart (a few seconds); reads resume normally after AOF replay</td>
+      <td><b style="color:#10b981;">0 calls</b> &mdash; cache and counter both survive; nothing extra to fetch</td>
+      <td>Self-healing via AOF + persistent volume. The 1000/day cap holds <b>across restarts</b>, not just within a single uptime.</td>
+    </tr>
+    <tr>
+      <td><b>Leader crashes mid-fetch</b><br><span style="font-size:0.82rem; color:#94a3b8;">e.g. <code>kill -9</code>, OOM, container restart</span></td>
+      <td><code>ensure</code> never runs &rarr; lock stays held until 7s auto-expire &rarr; followers wait then time out at 6s. <b style="color:#f59e0b;">Each leader holds a unique UUID (fencing token)</b>, so a slow leader waking up after expiry won't accidentally delete the new leader's lock.</td>
+      <td><span class="status-badge s-504">504</span> "Request timed out waiting for upstream result"</td>
+      <td><b style="color:#10b981;">≤1 call</b> &mdash; 0 if leader crashed before calling upstream, 1 if it crashed during or after</td>
+      <td>Wait up to 7s for the lock to auto-expire (that's the lock TTL). Then the next request takes over as new leader.</td>
+    </tr>
+    <tr>
+      <td><b>Upstream timeout</b><br><span style="font-size:0.82rem; color:#94a3b8;">5s HTTPParty timeout (~7%)</span></td>
+      <td>RateApiClient catches <code>Net::ReadTimeout</code>, raises TimeoutError &rarr; lock released</td>
+      <td><span class="status-badge s-504">504</span> "Upstream timed out"</td>
+      <td><b style="color:#10b981;">1 call</b> &mdash; quota consumed for the failed attempt</td>
+      <td>Next request becomes new leader and retries upstream.</td>
+    </tr>
+    <tr>
+      <td><b>Upstream HTTP 5xx</b><br><span style="font-size:0.82rem; color:#94a3b8;">~7% rate observed in <a href="upstream_behavior.html">live testing</a></span></td>
+      <td>RateApiClient sees non-200 status, raises UpstreamError &rarr; lock released, cache not written</td>
+      <td><span class="status-badge s-502">502</span> "Upstream error"</td>
+      <td><b style="color:#10b981;">1 call</b> &mdash; quota consumed for the failed attempt</td>
+      <td>Next request becomes new leader and retries upstream.</td>
+    </tr>
+    <tr>
+      <td><b>Upstream returns 200 with error body</b><br><span style="font-size:0.82rem; color:#94a3b8;">~7% rate observed in <a href="upstream_behavior.html">live testing</a></span></td>
+      <td>RateApiClient parses body, sees no <code>rate</code> field, raises UpstreamError &rarr; lock released, cache not written</td>
+      <td><span class="status-badge s-502">502</span> "Upstream error"</td>
+      <td><b style="color:#10b981;">1 call burned</b> &mdash; but we deliberately don't cache the bad response. Next request retries, no stale garbage stuck in cache.</td>
+      <td>Next request becomes new leader and retries upstream.</td>
+    </tr>
+    <tr>
+      <td><b>Upstream returns garbage values</b><br><span style="font-size:0.82rem; color:#94a3b8;">unknown hotel, zero/negative rate, decimal strings, missing fields</span></td>
+      <td>RateApiClient runs each record through a <b style="color:#f59e0b;">dry-schema</b> + positive-numeric check. Bad records are logged and skipped; the rest still get cached.</td>
+      <td>Service still returns the requested rate if it survived validation, otherwise <span class="status-badge s-502">502</span></td>
+      <td><b style="color:#10b981;">1 call</b> &mdash; partial response still better than zero</td>
+      <td>One bad row doesn't deny cache to 35 good rows. If <i>every</i> record is invalid the whole response is rejected.</td>
+    </tr>
+    <tr>
+      <td><b>Upstream 401 (auth failure)</b><br><span style="font-size:0.82rem; color:#94a3b8;">e.g. token rotation needed</span></td>
+      <td>RateApiClient raises UnauthorizedError &rarr; PricingService catches &rarr; <b>refunds the quota unit</b> (the call was rejected before processing)</td>
+      <td><span class="status-badge s-502">502</span> "Upstream authentication failed"</td>
+      <td><b style="color:#10b981;">1 call but quota refunded</b> &mdash; <code>QuotaGuard.refund_quota!</code> ensures bad tokens don't burn budget</td>
+      <td>Operator must rotate token. Until then, every cache miss costs 1 quota then refunds &mdash; budget stays intact.</td>
+    </tr>
+    <tr>
+      <td><b>Upstream HTTP 429 (their rate limit)</b><br><span style="font-size:0.82rem; color:#94a3b8;">~0.1% observed — upstream's daily limit hit</span></td>
+      <td>RateApiClient raises QuotaExhaustedError &rarr; PricingService catches</td>
+      <td><span class="status-badge s-429">429</span> + <code>Retry-After</code> header</td>
+      <td><b style="color:#10b981;">1 call</b> &mdash; rejected call still counts upstream-side</td>
+      <td>Wait until upstream's window resets (assumed UTC midnight, see D4). Our QuotaGuard catches the same condition locally before the call — this row is the rare race where our counter and upstream's diverge.</td>
+    </tr>
+    <tr>
+      <td><b>Quota counter at 1000</b><br><span style="font-size:0.82rem; color:#94a3b8;">budget exhausted for the day</span></td>
+      <td>QuotaGuard's atomic INCR returns 1001 &rarr; raises ExhaustedError <b>before</b> RateApiClient is called</td>
+      <td><span class="status-badge s-429">429</span> + <code>Retry-After</code> header (seconds until UTC midnight)</td>
+      <td><b style="color:#10b981;">0 calls</b> &mdash; the deterministic guarantee that 1000 is never exceeded (verified by the <a href="#verified">Quota hard cap</a> test in Load &amp; Chaos Tests)</td>
+      <td>Counter auto-resets at UTC midnight via <code>EXPIREAT</code>. <b>Users hitting cache still get their rate</b> — only fresh fetches get blocked.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="card blue" style="margin-top:18px;">
+  <h4>Design principle</h4>
+  <p>Every dependency failure routes to a 5xx response. The service <b>never</b> calls upstream when its protection layers (cache / lock / quota) are degraded. This is "fail-closed" — protect the upstream contract at the cost of own uptime, which is the right priority for a proxy.</p>
+</div>
+
+</section>
+
+<!-- ==================== Upstream API ==================== -->
+<section id="upstream">
+<h2>Upstream API Findings</h2>
+<p>Two live test runs — 1001 calls each — against the upstream rate API, run before implementation. <span style="color:#ef4444;font-weight:600;">~28% failure rate</span> across 4 distinct failure modes, all confirmed in both single and bulk requests.</p>
+
+<div class="finding danger">
+  <div class="finding-title" style="font-size:1.08rem;font-weight:700;color:#f1f5f9;">HTTP 200 does not mean success</div>
+  <div class="finding-row"><span class="finding-label">Finding</span><span class="finding-value">Upstream returns <span class="status-badge s-200">200</span> for three distinct failure modes: error body with no <code>rates</code> key (~7%), <code>rate</code> field silently absent from response (~7%), and empty <code>rates</code> array. HTTP status alone cannot be trusted.</span></div>
+  <div class="finding-row"><span class="finding-label">Decision</span><span class="finding-value"><code>RateApiClient</code> inspects the response body on every 200 — each failure mode raises <code>UpstreamError</code>, never returns nil silently.</span></div>
+</div>
+
+<div class="finding warn">
+  <div class="finding-title" style="font-size:1.08rem;font-weight:700;color:#f1f5f9;">Missing <code>rate</code> field is not quota exhaustion</div>
+  <div class="finding-row"><span class="finding-label">Finding</span><span class="finding-value">Initial design assumed a missing <code>rate</code> field meant quota was exhausted. Testing proved otherwise — the missing field is an intermittent processing error (~7% regardless of quota). Quota exhaustion has its own signal: <span class="status-badge s-429">429</span> with <code>{"error":"Rate limit exceeded (1000/day)"}</code>.</span></div>
+  <div class="finding-row"><span class="finding-label">Decision</span><span class="finding-value">Map HTTP 429 → <code>QuotaExhaustedError</code>. Map missing rate → <code>UpstreamError</code>. Two separate exceptions, two separate response paths.</span></div>
+</div>
+
+<div class="finding warn">
+  <div class="finding-title" style="font-size:1.08rem;font-weight:700;color:#f1f5f9;">401 does not consume upstream quota — refund on auth failure</div>
+  <div class="finding-row"><span class="finding-label">Finding</span><span class="finding-value">Empirically verified: 1000 invalid-token calls followed by a valid call returned 200, not 429. Upstream rejects 401s before any processing occurs.</span></div>
+  <div class="finding-row"><span class="finding-label">Decision</span><span class="finding-value"><code>QuotaGuard</code> pre-consumes one unit before every upstream call. On 401, it refunds the unit — the request never reached upstream processing.</span></div>
+</div>
+
+<div style="margin-top:20px;text-align:center;">
+  <a href="upstream_behavior.html" class="report-link">Full test data &amp; error mapping &rarr;</a>
+</div>
+</section>
+
+<!-- ==================== Load & Chaos Tests ==================== -->
+<section id="verified">
+<h2>Load &amp; Chaos Tests</h2>
+
+<p style="color:#94a3b8; margin-bottom:16px;">Unit tests prove the code is correct. <b>Load tests prove it works under real traffic.</b> I ran 4 tests against the live app (Rails + Redis + rate-api) — here's what each one asks and what I measured.</p>
+
+<table>
+  <thead>
+    <tr><th>What I'm testing</th><th>The question</th><th>What I measured</th><th></th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>Single-flight lock</b></td>
+      <td>If 50 users hit the API at the same time on a cold cache, do they all hammer the upstream — or does my lock collapse them into one call?</td>
+      <td><b>1,404 client requests → 1 upstream call</b><br><span style="color:#64748b; font-size:0.88rem;">5 seconds at 50 concurrent connections</span></td>
+      <td><span style="color:#10b981; font-weight:700;">✓ PASS</span></td>
+    </tr>
+    <tr>
+      <td><b>Cache hit rate</b></td>
+      <td>Under steady traffic, what percent of requests are served from cache vs. hitting the upstream?</td>
+      <td><b>99.93% hit rate</b><br><span style="color:#64748b; font-size:0.88rem;">7,081 hits / 5 misses in 30 seconds</span></td>
+      <td><span style="color:#10b981; font-weight:700;">✓ PASS</span></td>
+    </tr>
+    <tr>
+      <td><b>Quota hard cap</b></td>
+      <td>If something goes wrong and we approach the 1,000/day upstream limit, does the 1,001st call get blocked — or does it leak through?</td>
+      <td><b>HTTP 429 returned, 0 upstream calls</b><br><span style="color:#64748b; font-size:0.88rem;">Set counter to 1000, next request blocked with <code>Retry-After: 31254s</code> (until UTC midnight)</span></td>
+      <td><span style="color:#10b981; font-weight:700;">✓ PASS</span></td>
+    </tr>
+    <tr>
+      <td><b>Fail-closed when Redis dies</b></td>
+      <td>If Redis crashes, does the service keep accidentally calling upstream — or does it shut the door cleanly?</td>
+      <td><b>5/5 requests blocked, 0 upstream calls</b><br><span style="color:#64748b; font-size:0.88rem;">All returned HTTP 504; service auto-recovered when Redis came back</span></td>
+      <td><span style="color:#10b981; font-weight:700;">✓ PASS</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<p style="margin-top:14px; font-size:0.92rem; color:#64748b;"><b>Try it yourself:</b> <code>cd load_test &amp;&amp; ./run_all.sh</code> (~6 minutes total) or <code>DURATION=30s ./run_all.sh</code> (~1 minute smoke test).</p>
+</section>
+
+<!-- ==================== File Inventory ==================== -->
+<section id="files">
+<h2>File Inventory</h2>
+<p style="color:#94a3b8; margin-top:-8px; margin-bottom:18px;">Rails project tree with annotations. <b style="color:#10b981;">NEW</b> = I wrote it. <b style="color:#f59e0b;">MOD</b> = starter file I edited. <b style="color:#64748b;">UNTOUCHED</b> = Rails defaults left as-is.</p>
+
+<pre class="tree" style="font-size:0.82rem; line-height:1.7;">
+inference-cache-gateway/
+├── app/
+│   ├── controllers/
+│   │   ├── api/v1/pricing_controller.rb      <span style="color:#f59e0b;">[MOD]</span>  extracted whitelists, broadened error rendering
+│   │   └── application_controller.rb         <span style="color:#64748b;">[UNTOUCHED]</span>
+│   ├── models/
+│   │   ├── pricing_constants.rb              <span style="color:#10b981;">[NEW]</span>  whitelist (period/hotel/room) — moved out of controller
+│   │   └── application_record.rb             <span style="color:#64748b;">[UNTOUCHED]</span>
+│   ├── services/
+│   │   ├── api/v1/pricing_service.rb         <span style="color:#f59e0b;">[MOD]</span>  rewrote stub into 4-layer orchestrator + error mapping
+│   │   ├── base_service.rb                   <span style="color:#64748b;">[UNTOUCHED]</span>  result / errors pattern (kept the starter)
+│   │   ├── rate_cache.rb                     <span style="color:#10b981;">[NEW]</span>  <b>L1</b> 5-min TTL cache
+│   │   ├── lock_and_fetch_rate.rb            <span style="color:#10b981;">[NEW]</span>  <b>L2</b> SETNX leader election + fencing token
+│   │   └── quota_guard.rb                    <span style="color:#10b981;">[NEW]</span>  <b>L3</b> atomic 1000/day cap + refund-on-401
+│   ├── jobs/application_job.rb               <span style="color:#64748b;">[UNTOUCHED]</span>
+│   └── channels/                             <span style="color:#64748b;">[UNTOUCHED]</span>
+├── lib/
+│   └── rate_api_client.rb                    <span style="color:#f59e0b;">[MOD]</span>  <b>L4</b> ACL — added typed exceptions, dry-schema, bulk fetch
+├── config/
+│   ├── routes.rb                             <span style="color:#64748b;">[UNTOUCHED]</span>  the starter already scoped /api/v1/pricing
+│   ├── initializers/
+│   │   ├── lograge.rb                        <span style="color:#10b981;">[NEW]</span>  structured JSON logs (cache_status, upstream_latency_ms)
+│   │   ├── cors.rb                           <span style="color:#64748b;">[UNTOUCHED]</span>
+│   │   ├── filter_parameter_logging.rb       <span style="color:#64748b;">[UNTOUCHED]</span>
+│   │   └── inflections.rb                    <span style="color:#64748b;">[UNTOUCHED]</span>
+│   ├── environments/{development,production,test}.rb  <span style="color:#f59e0b;">[MOD]</span>  cache_store + lograge wiring
+│   └── application.rb / boot.rb / environment.rb / puma.rb / cable.yml / database.yml / locales/  <span style="color:#64748b;">[UNTOUCHED]</span>
+├── test/
+│   ├── services/pricing_service_test.rb      <span style="color:#10b981;">[NEW]</span>
+│   ├── services/rate_cache_test.rb           <span style="color:#10b981;">[NEW]</span>
+│   ├── services/lock_and_fetch_rate_test.rb  <span style="color:#10b981;">[NEW]</span>
+│   ├── services/quota_guard_test.rb          <span style="color:#10b981;">[NEW]</span>
+│   ├── lib/rate_api_client_test.rb           <span style="color:#10b981;">[NEW]</span>
+│   ├── controllers/pricing_controller_test.rb<span style="color:#f59e0b;">[MOD]</span>  expanded to cover new error paths
+│   └── test_helper.rb                        <span style="color:#f59e0b;">[MOD]</span>  + WebMock, SimpleCov, Timecop
+├── load_test/                                <span style="color:#10b981;">[NEW]</span>  <b>chaos test suite</b>
+│   ├── 1_singleflight.sh                     50 concurrent cold-start → 1 upstream call
+│   ├── 2_cache_hit_rate.sh                   sustained load → ≥99% hit rate
+│   ├── 3_quota_cap.sh                        counter at 1000 → 1001st blocked, 0 leak
+│   ├── 4_fail_closed.sh                      Redis stopped → all 5xx, 0 upstream
+│   ├── lib.sh / run_all.sh                   shared helpers + orchestrator
+│   └── README.md
+├── bin/                                      <span style="color:#64748b;">[UNTOUCHED]</span>  bundle / rails / rake / setup / docker-entrypoint
+├── db/seeds.rb                               <span style="color:#64748b;">[UNTOUCHED]</span>
+├── public/robots.txt                         <span style="color:#64748b;">[UNTOUCHED]</span>
+├── Gemfile / Gemfile.lock                    <span style="color:#f59e0b;">[MOD]</span>  + redis, lograge, dry-schema, simplecov, timecop, webmock, rubocop
+├── docker-compose.yml                        <span style="color:#f59e0b;">[MOD]</span>  + Redis container, AOF persistence, env wiring
+├── Dockerfile                                <span style="color:#64748b;">[UNTOUCHED]</span>
+├── .gitignore                                <span style="color:#f59e0b;">[MOD]</span>  + log/.env/coverage entries
+├── .env.example                              <span style="color:#10b981;">[NEW]</span>  RATE_API_URL / RATE_API_TOKEN
+├── .rubocop.yml                              <span style="color:#10b981;">[NEW]</span>  style rules
+├── upstream_test.rb                          <span style="color:#10b981;">[NEW]</span>  small Ruby script that hits upstream a bunch of times to see how it really behaves
+├── UPSTREAM_BEHAVIOR.md                      <span style="color:#10b981;">[NEW]</span>  documented response patterns from 1001 live calls
+├── README.md                                 <span style="color:#f59e0b;">[MOD]</span>  rewrote to point at this design site
+└── Netify_site/                              <span style="color:#10b981;">[NEW]</span>  this design site (3 HTML pages + diagram)
+</pre>
+
+<div class="card blue" style="margin-top:18px;">
+  <h4>Why this matters</h4>
+  <p>Boilerplate (<code>bin/</code>, most <code>config/</code>, <code>db/</code>, channels, jobs) is left as Rails defaults — there's no value in reformatting code I didn't change. Reviewer can focus on the <b style="color:#10b981;">NEW</b> and <b style="color:#f59e0b;">MOD</b> entries.</p>
+</div>
+</section>
+
+<!-- ==================== AI Usage ==================== -->
+<section id="ai-usage">
+<h2>Agent-First Workflow</h2>
+
+<blockquote style="margin:0 0 20px;padding:12px 16px;background:#1e293b;border-left:3px solid #334155;border-radius:0 6px 6px 0;">
+  <p style="margin:0 0 4px;font-size:0.92rem;color:#94a3b8;font-style:italic;">"Accelerate your agents with convention over configuration."</p>
+  <p style="margin:0;font-size:0.82rem;color:#475569;font-style:italic;"><a href="https://rubyonrails.org" target="_blank" style="color:#475569;text-decoration:none;">Ruby on Rails scales from <span style="color:#94a3b8;">PROMPT</span> to IPO. Token-efficient code that's easy for agents to write and beautiful for humans to review.</a> — <a href="https://rubyonrails.org" target="_blank" style="color:#64748b;">rubyonrails.org</a></p>
+</blockquote>
+
+<p style="color:#64748b;margin-bottom:16px;"><b>Tool:</b> <span style="color: #38bdf8;">Claude Code (CLI)</span> — Anthropic's official CLI for Claude &nbsp;·&nbsp; <span style="color: #38bdf8;">Claude Opus 4.7</span></p>
+
+<p style="margin-bottom: 6px; font-size: 1.05rem;"><span style="color: #f1f5f9; font-weight: 700;">I direct &amp; define</span> &rarr; <span style="color: #64748b;">agent executes</span> &rarr; <span style="color: #f1f5f9; font-weight: 700;">I review, challenge, and decide.</span></p>
+<p style="margin-bottom: 20px; font-size: 1.05rem; color: #94a3b8;">I am the <span style="color: #38bdf8; font-weight: 600;">starting point (design)</span> and the <span style="color: #38bdf8; font-weight: 600;">finish line (quality)</span> — the agent accelerates everything in between.</p>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+  <div class="card blue">
+    <h4 style="color: #38bdf8;">My Role — Direct &amp; Decide</h4>
+    <p style="font-size: 0.9rem; color: #cbd5e1; margin: 8px 0 14px; line-height: 1.6;">I set the direction, owned every architectural decision, and defined the constraints at every layer. A few examples of what that looked like in practice:</p>
+    <p style="font-size: 0.85rem; color: #94a3b8; margin: 6px 0 10px;">Direction</p>
+    <ul style="margin: 0 0 12px 16px; font-size: 0.92rem; line-height: 1.8;">
+      <li>Designed the 4-layer architecture and all the rules before any code was written — I designed it; the agent built it</li>
+      <li><b>Scalability</b> — designed batch fetch: one upstream call returns all 36 rates at once instead of 36 separate calls on every cache miss</li>
+      <li><b>Observability</b> — added structured JSON logging on every request with <code>cache_status</code> and <code>upstream_latency_ms</code>, so every cache hit/miss and latency spike shows up in logs</li>
+      <li><b>Risk</b> — moved <code>RATE_API_TOKEN</code> out of docker-compose into <code>.env</code> so secrets are never committed to the repo; switched QuotaGuard from <code>Redis.new</code> to <code>Rails.cache</code> connection pool to prevent connection leaks under load</li>
+    </ul>
+    <p style="font-size: 0.85rem; color: #94a3b8; margin: 6px 0 10px;">Challenge &amp; Correct</p>
+    <ul style="margin: 0 0 12px 16px; font-size: 0.92rem; line-height: 1.8;">
+      <li>Kept pushing for better — flagging edge cases, race conditions, and scenarios it hadn't thought through</li>
+      <li>Pulled it back when it went off the rails or got the wrong idea about what to build</li>
+      <li>Pushed for names that read like plain English and match the business logic: <code>SingleFlight</code> &rarr; <code>LockAndFetchRate</code>, <code>permit!</code> &rarr; <code>consume_quota!</code></li>
+      <li>Ran 1,001 live upstream calls because I didn't trust the agent's error classification — found that a missing <code>rate</code> field has nothing to do with quota exhaustion; fixed 3 exception types as a result</li>
+      <li>Caught a Redis bug the agent missed: calling <code>refund_quota!</code> before the key exists creates a negative counter with no TTL, which breaks all future quota counts</li>
+    </ul>
+    <p style="font-size: 0.85rem; color: #94a3b8; margin: 6px 0 10px;">Review the final outcome</p>
+    <ul style="margin: 0 0 0 16px; font-size: 0.92rem; line-height: 1.8;">
+      <li>Reviewed every diff line by line — accepted, rejected, or sent back for revision</li>
+      <li>Every technical and trade-off decision was mine — the agent laid out options, I made the call: layer ordering, lock scope, batch vs single fetch, failure modes, HTTP status codes</li>
+      <li>Caught a key bug in <code>LockAndFetchRate</code>: the agent used the same key for both the lock and the cache, so followers looked up the wrong key and got nothing back — split into separate <code>lock_key</code> and <code>cache_key</code></li>
+      <li>Removed unused methods the agent added "for future use" — kept the codebase focused on solving the actual problem, not hypothetical ones</li>
+      <li>Rejected a single giant commit; required 3 focused commits instead, each with one clear purpose</li>
+    </ul>
+  </div>
+  <div class="card green">
+    <h4 style="color: #10b981;">Agent Role — Code, Tests &amp; Docs</h4>
+    <p style="font-size: 0.92rem; color: #94a3b8; margin: 8px 0 12px;">Given clear direction, the agent works autonomously and produces output ready for review.</p>
+    <ul style="margin: 0 0 0 16px; font-size: 0.92rem; line-height: 1.8;">
+      <li><b>Code</b> — implemented each layer from my specs; I reviewed every change and decided what to keep</li>
+      <li><b>Tests</b> — built out the test structure on its own; I checked scenario coverage and edge cases</li>
+      <li><b>Trade-off analysis</b> — laid out implementation options with pros/cons; I made the call based on project constraints</li>
+      <li><b>Documentation</b> — drafted comments and docs; I finalized for accuracy and conciseness</li>
+      <li><b>Workflow</b> — handled git commits, environment setup, test runs, and API testing autonomously</li>
+    </ul>
+  </div>
+</div>
+</section>
+
+<!-- ==================== Footer ==================== -->
+<div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid #1e293b; text-align: center; color: #475569; font-size: 0.9rem;">
+  Inference Cache Gateway — Case Study by Dane Wu
+</div>
+
+<script>
+const sectionLabels = {
+  challenge: 'Challenge',
+  funnel: 'Solution',
+  architecture: 'Architecture',
+  quickstart: 'Quick Start',
+  cache: 'RateCache',
+  lock: 'LockAndFetchRate',
+  quota: 'QuotaGuard',
+  batch: 'Batch Fetch',
+  flow: 'Request Flow',
+  decisions: 'Decisions',
+  nongoals: 'Non-Goals',
+  failures: 'Failure Modes',
+  upstream: 'API Findings',
+  verified: 'Load & Chaos Tests',
+  files: 'File Inventory',
+  'ai-usage': 'Agent-First Workflow'
+};
+const sections = Object.keys(sectionLabels);
+const navLinks = document.querySelectorAll('#nav a');
+const hint = document.getElementById('nav-hint');
+let hasScrolled = false;
+
+function setActive(current) {
+  navLinks.forEach(a => {
+    const href = a.getAttribute('href').slice(1);
+    if (href === current) { a.classList.add('active'); a.classList.remove('idle'); }
+    else { a.classList.remove('active'); a.classList.remove('idle'); }
+  });
+  if (!hasScrolled) { hasScrolled = true; hint.classList.add('scrolled'); }
+  hint.innerHTML = 'Current section: <span style="color:#38bdf8; font-weight:600;">' + sectionLabels[current] + '</span>';
+}
+function updateActiveSection() {
+  // Threshold must be >= section's scroll-margin-top (240px in CSS) so that
+  // a section just clicked-to (sitting at 240px below viewport) is detected as current.
+  let current = sections[0];
+  for (const id of sections) {
+    const el = document.getElementById(id);
+    if (el && el.getBoundingClientRect().top <= 170) current = id;
+  }
+  setActive(current);
+}
+// Toggle nav to fixed-position once scrolled past its original location.
+const navWrap = document.getElementById('nav-wrap');
+const navOriginalTop = navWrap.getBoundingClientRect().top + window.scrollY;
+let navHeightSpacer = null;
+function updateNavFixed() {
+  if (window.scrollY >= navOriginalTop) {
+    if (!navWrap.classList.contains('fixed')) {
+      // Capture height BEFORE adding class (so we can offset content)
+      const h = navWrap.offsetHeight;
+      navWrap.classList.add('fixed');
+      if (!navHeightSpacer) {
+        navHeightSpacer = document.createElement('div');
+        navHeightSpacer.style.height = h + 'px';
+        navWrap.parentNode.insertBefore(navHeightSpacer, navWrap);
+      }
+    }
+  } else {
+    if (navWrap.classList.contains('fixed')) {
+      navWrap.classList.remove('fixed');
+      if (navHeightSpacer) { navHeightSpacer.remove(); navHeightSpacer = null; }
+    }
+  }
+}
+
+// Lock the active section during click-driven scrolling so the scroll handler
+// doesn't override the clicked target mid-flight.
+let clickLockUntil = 0;
+window.addEventListener('scroll', () => {
+  updateNavFixed();
+  if (Date.now() < clickLockUntil) return;
+  updateActiveSection();
+}, { passive: true });
+navLinks.forEach(a => a.addEventListener('click', () => {
+  const target = a.getAttribute('href').slice(1);
+  setActive(target);                    // light up immediately
+  clickLockUntil = Date.now() + 1500;   // ignore scroll events for 1.5s while animating
+}));
+
+function toggleDecision(header) {
+  header.parentElement.classList.toggle('open');
+}
+
+function copyCmd(btn) {
+  const text = btn.parentElement.querySelector('code').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+  });
+}
+</script>
+
+</body>
+</html>
