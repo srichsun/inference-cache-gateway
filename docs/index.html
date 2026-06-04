@@ -622,7 +622,7 @@ Total keys: <span class="number">36</span> (4 periods &times; 3 hotels &times; 3
   </ul>
   <p>Normally the 1,001st call is rejected up front with 429 &mdash; upstream never runs the expensive inference for it. But if that limiter ever misconfigures (bug, redeploy, staging quirk), our overflow would actually hit the <b style="color:#ef4444;">computationally expensive</b> inference and burn real compute. <b>QuotaGuard keeps us honest to the 1,000/day contract <span style="color:#f59e0b;">regardless of upstream's enforcement state</span>.</b></p>
   <div style="background:#1e293b40; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:0 6px 6px 0; margin-top:8px;">
-    <p style="margin:0 0 6px;"><b style="color:#f59e0b;">Trade-offs accepted:</b></p>
+    <p style="margin:0 0 6px;"><b style="color:#f59e0b;">接受的 trade-off：</b></p>
     <ul style="margin:0 0 0 18px; font-size:0.95rem;">
       <li><b>Duplicated state</b> &mdash; the cap is enforced in two places (upstream &amp; here). If upstream relaxes to 2,000, <code>DAILY_LIMIT</code> needs updating too.</li>
       <li><b>Added complexity</b> &mdash; ~50 lines of code + tests + a Redis dependency for a layer that should never trigger in normal operation. A minimalist approach would skip QuotaGuard and trust upstream's own 429, accepting the small latency / observability cost.</li>
@@ -750,28 +750,28 @@ Redis INCR &rarr; <span class="number">1001</span> &rarr; raise ExhaustedError &
     <div class="decision-arrow">&#9656;</div>
   </div>
   <div class="decision-body">
-    <p>Bulk fetching itself isn't a real choice &mdash; the math forces it: 36 combos &times; 288 cache windows/day = <b>10,368 calls</b>, way over the 1,000 budget. So <i>each</i> upstream call has to return all 36 rates. Under a 5-min TTL, <b>288/day is the math floor on the upper bound</b> &mdash; no compliant design can do fewer at peak. The interesting question is <b>when</b> to trigger that call: on the first cache miss (lazy &mdash; <b style="color:#10b981;">0 at the lower bound</b>), or on a schedule (prewarming &mdash; always &ge; 288).</p>
+    <p>Batch fetch 本身不是選擇題 &mdash; 數學就是這樣強迫的：36 種組合 &times; 每天 288 個 cache 窗口 = <b>10,368 次呼叫</b>，遠超 1,000 的預算。所以<i>每次</i> upstream 呼叫必須一次回傳全部 36 個房價。在 5 分鐘 TTL 下，<b>288/天是上限的數學下限</b> &mdash; 沒有任何符合規範的設計在尖峰時能做得更少。真正值得思考的是<b>何時</b>觸發這個呼叫：第一次 cache miss 時（lazy &mdash; <b style="color:#10b981;">下限為 0</b>），還是按排程（prewarming &mdash; 固定 &ge; 288）。</p>
     <table>
-      <thead><tr><th>Option</th><th>Behaviour</th></tr></thead>
+      <thead><tr><th>選項</th><th>行為</th></tr></thead>
       <tbody>
         <tr>
-          <td>Periodic prewarming<br><span style="font-size:0.82rem; color:#94a3b8;">e.g. Sidekiq cron every 4 min</span></td>
-          <td>Cache always warm, every request is instant. <b>But:</b> burns <b>360 calls/day</b> even at zero traffic; needs extra infra (Sidekiq + scheduler).</td>
+          <td>定期 prewarming<br><span style="font-size:0.82rem; color:#94a3b8;">例如 Sidekiq cron 每 4 分鐘執行</span></td>
+          <td>Cache 始終保持熱，每個請求都即時回應。<b>但：</b>即使零流量也消耗 <b>360 次/天</b>；需要額外基礎設施（Sidekiq + scheduler）。</td>
         </tr>
         <tr>
           <td><b>Lazy on-demand</b> &#10003;</td>
-          <td><b style="color:#f59e0b;">Upstream cost proportional to actual demand</b> &mdash; 0 calls when nobody's asking, up to 288/day at full traffic. No extra infra.</td>
+          <td><b style="color:#f59e0b;">Upstream 成本與實際需求成比例</b> &mdash; 沒人查詢時 0 次，滿載時最多 288/天。不需要額外基礎設施。</td>
         </tr>
       </tbody>
     </table>
-    <p><b>Why lazy fits this workload:</b></p>
+    <p><b>為什麼 lazy 適合這個工作負載：</b></p>
     <ul style="margin:6px 0 8px 20px;">
-      <li>Spec frames upstream as <b style="color:#ef4444;">computationally expensive</b> &mdash; we want to burn quota only when there's real demand</li>
-      <li>Hospitality traffic is uneven (peak season, rush hours, dead hours); lazy adapts naturally</li>
-      <li>Tight 1,000/day budget rewards proportional usage; prewarming's fixed 360/day leaves no room if traffic spikes break the cache math</li>
+      <li>上游被定義為<b style="color:#ef4444;">計算成本極高</b> &mdash; 只在有真實需求時才消耗配額</li>
+      <li>旅宿流量不均勻（旺季、尖峰時段、離峰時段）；lazy 自然適應</li>
+      <li>1,000/天的緊張預算獎勵按比例使用；prewarming 固定消耗 360/天，若流量尖峰打破 cache 數學就沒有餘裕</li>
     </ul>
-    <p style="background:#1e293b40; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:0 6px 6px 0; margin-top:8px;"><b style="color:#f59e0b;">Prewarming is the right call when:</b> traffic is predictable and steady, latency SLAs are strict (any cache miss is unacceptable), or the quota budget is generous. For those workloads, prewarming wins. Different constraint, different answer.</p>
-    <p><b>Trade-off accepted:</b> the first user to hit an expired cache pays a small latency tax (waits for the upstream call). All subsequent requests in that 5-min window are instant cache hits.</p>
+    <p style="background:#1e293b40; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:0 6px 6px 0; margin-top:8px;"><b style="color:#f59e0b;">Prewarming 是正確選擇的情況：</b>流量可預測且穩定、延遲 SLA 嚴格（任何 cache miss 都不可接受），或配額預算充裕。在那些工作負載下，prewarming 勝出。不同限制條件，不同答案。</p>
+    <p><b>接受的 trade-off：</b>第一個遇到過期 cache 的使用者要承擔小額的延遲成本（等待 upstream 呼叫）。之後在同一個 5 分鐘窗口內的所有請求都是即時 cache 命中。</p>
   </div>
 </div>
 
@@ -784,14 +784,14 @@ Redis INCR &rarr; <span class="number">1001</span> &rarr; raise ExhaustedError &
   </div>
   <div class="decision-body">
     <table>
-      <thead><tr><th>Option</th><th>Rejected because</th></tr></thead>
+      <thead><tr><th>選項</th><th>被排除的原因</th></tr></thead>
       <tbody>
-        <tr><td><code>MemoryStore</code></td><td>Per-Puma-worker memory — hit ratio divided by worker count, breaks 10:1 requirement.</td></tr>
-        <tr><td><code>SolidCache</code></td><td>SQLite-based; no atomic <code>INCR</code> for quota; row-level lock contention.</td></tr>
-        <tr><td><b>Redis</b> &#10003;</td><td>Cross-worker sharing; atomic primitives (<code>SET NX</code>, <code>INCR</code>, <code>EXPIREAT</code>) solve cache, lock, and quota with one dependency.</td></tr>
+        <tr><td><code>MemoryStore</code></td><td>每個 Puma worker 各自的記憶體 — 命中率除以 worker 數量，無法滿足 10:1 的需求。</td></tr>
+        <tr><td><code>SolidCache</code></td><td>基於 SQLite；沒有原子 <code>INCR</code> 可用於配額；row-level lock 爭用。</td></tr>
+        <tr><td><b>Redis</b> &#10003;</td><td>跨 worker 共享；原子操作（<code>SET NX</code>、<code>INCR</code>、<code>EXPIREAT</code>）用一個依賴項解決 cache、lock 和配額三個問題。</td></tr>
       </tbody>
     </table>
-    <p><b>Trade-off:</b> one extra service in <code>docker-compose.yml</code>. Worth it — Redis is ubiquitous in Rails production.</p>
+    <p><b>Trade-off：</b><code>docker-compose.yml</code> 多一個服務。值得 — Redis 在 Rails production 環境中極為普遍。</p>
   </div>
 </div>
 
@@ -803,7 +803,7 @@ Redis INCR &rarr; <span class="number">1001</span> &rarr; raise ExhaustedError &
     <div class="decision-arrow">&#9656;</div>
   </div>
   <div class="decision-body">
-    <p>Without coalescing, a 50-request burst burns 50 units of the daily budget in milliseconds. Redis <code>SET NX</code> elects one leader across all Puma workers; followers poll the cache.</p>
+    <p>沒有合併機制，50 個請求的爆發會在毫秒內燒掉 50 個每日配額單位。Redis <code>SET NX</code> 在所有 Puma worker 中選出一個 leader；其餘 followers 輪詢 cache。</p>
 
     <pre><span class="comment">// LockAndFetchRate pseudocode:</span>
 token = SecureRandom.uuid                              <span class="comment">// per-leader fencing token</span>
@@ -812,9 +812,9 @@ token = SecureRandom.uuid                              <span class="comment">// 
    Lua: <span class="keyword">if</span> GET == token <span class="keyword">then</span> DEL          <span class="comment">// release only if still ours</span>
 <span class="keyword">else</span> &rarr; follower: poll cache every 50ms up to 6s</pre>
 
-    <p><b style="color:#f59e0b;">Fencing token:</b> each leader holds a unique UUID. On release, a Lua script checks "still mine?" before deleting &mdash; otherwise a slow leader could wipe the new leader's lock and let a third request slip in.</p>
+    <p><b style="color:#f59e0b;">Fencing token：</b>每個 leader 持有一個唯一的 UUID。釋放時，Lua script 先確認「還是我的？」才刪除 &mdash; 否則一個緩慢的 leader 可能誤刪新 leader 的 lock，讓第三個請求趁虛而入。</p>
 
-    <p style="background:#1e293b40; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:0 6px 6px 0; margin-top:8px;"><b style="color:#f59e0b;">Single-Redis assumption:</b> under Sentinel / Cluster HA, primary failover can briefly produce two leaders. Production HA wants a Raft-based coordinator (etcd / Consul). QuotaGuard's atomic counter is a second line of defence &mdash; even if two leaders co-exist briefly, the daily cap still holds.</p>
+    <p style="background:#1e293b40; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:0 6px 6px 0; margin-top:8px;"><b style="color:#f59e0b;">單一 Redis 假設：</b>在 Sentinel / Cluster HA 下，primary failover 可能短暫產生兩個 leader。Production HA 環境需要基於 Raft 的協調器（etcd / Consul）。QuotaGuard 的原子計數器是第二道防線 &mdash; 即使兩個 leader 短暫並存，每日上限仍然成立。</p>
   </div>
 </div>
 
@@ -826,37 +826,37 @@ token = SecureRandom.uuid                              <span class="comment">// 
     <div class="decision-arrow">&#9656;</div>
   </div>
   <div class="decision-body">
-    <p>The upstream limit is 1,000 calls per day &mdash; not per second. So we need a simple counter that resets at midnight.</p>
+    <p>Upstream 的限制是每天 1,000 次 &mdash; 不是每秒。所以我們需要一個在午夜重置的簡單計數器。</p>
 
-    <h5 style="color:#94a3b8; text-transform:uppercase; font-size:0.78rem; letter-spacing:0.08em; margin:18px 0 6px;">Why this layer exists</h5>
-    <p>Batch Fetch already keeps the theoretical max at <b>288 calls/day</b> &mdash; well under budget. Under normal operation, QuotaGuard never triggers.</p>
-    <p>The honest remaining value is <b style="color:#f59e0b;">defensive client behavior</b>: we cap our own call rate at 1,000/day even if upstream's own rate limiter fails to enforce it (bug, redeploy, staging quirk). In that edge case our overflow would otherwise hit upstream's <b style="color:#ef4444;">computationally expensive</b> inference and burn real compute. QuotaGuard prevents that.</p>
+    <h5 style="color:#94a3b8; text-transform:uppercase; font-size:0.78rem; letter-spacing:0.08em; margin:18px 0 6px;">為什麼需要這一層</h5>
+    <p>Batch Fetch 已將理論最大值壓在 <b>288 次/天</b> &mdash; 遠低於預算。正常運作下，QuotaGuard 永遠不會觸發。</p>
+    <p>真正的殘餘價值是<b style="color:#f59e0b;">防禦性的客戶端行為</b>：即使 upstream 自身的 rate limiter 因 bug、重新部署或 staging 問題而失效，我們仍將自己的呼叫速率限制在 1,000/天。在那種邊界情況下，溢出的請求會打到 upstream 那台<b style="color:#ef4444;">計算成本極高</b>的推論引擎並燒掉真實算力。QuotaGuard 防止了這件事。</p>
     <div style="background:#1e293b40; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:0 6px 6px 0; margin-top:8px;">
-      <p style="margin:0 0 6px;"><b style="color:#f59e0b;">Trade-offs accepted:</b></p>
+      <p style="margin:0 0 6px;"><b style="color:#f59e0b;">接受的 trade-off：</b></p>
       <ul style="margin:0 0 0 18px; font-size:0.95rem;">
-        <li><b>Duplicated state</b> &mdash; the cap is enforced in two places (upstream &amp; here). If upstream relaxes to 2,000, <code>DAILY_LIMIT</code> needs updating too.</li>
-        <li><b>Added complexity</b> &mdash; ~50 lines of code + tests + a Redis dependency for a layer that should never trigger in normal operation. A minimalist approach would skip QuotaGuard and trust upstream's own 429, accepting the small latency / observability cost.</li>
+        <li><b>重複狀態</b> &mdash; 上限在兩個地方都被強制執行（upstream 和這裡）。如果 upstream 放寬到 2,000，<code>DAILY_LIMIT</code> 也需要更新。</li>
+        <li><b>增加複雜度</b> &mdash; ~50 行程式碼 + 測試 + Redis 依賴，用於一個在正常運作下永遠不應觸發的層。極簡做法是跳過 QuotaGuard，信任 upstream 自己的 429，接受小額的延遲 / 可觀測性成本。</li>
       </ul>
     </div>
 
-    <h5 style="color:#94a3b8; text-transform:uppercase; font-size:0.78rem; letter-spacing:0.08em; margin:18px 0 6px;">Why Redis</h5>
-    <p>The counter must be shared across all Puma workers (separate processes), and <code>INCR</code> is atomic &mdash; it increments and returns the new value in one step, so two workers can never both read 999 and both pass the check.</p>
+    <h5 style="color:#94a3b8; text-transform:uppercase; font-size:0.78rem; letter-spacing:0.08em; margin:18px 0 6px;">為什麼選 Redis</h5>
+    <p>計數器必須在所有 Puma worker（獨立 process）間共享，而 <code>INCR</code> 是原子操作 &mdash; 它在單一步驟內遞增並回傳新值，所以兩個 worker 不可能同時讀到 999 並同時通過檢查。</p>
 
-    <h5 style="color:#94a3b8; text-transform:uppercase; font-size:0.78rem; letter-spacing:0.08em; margin:18px 0 6px;">Implementation</h5>
+    <h5 style="color:#94a3b8; text-transform:uppercase; font-size:0.78rem; letter-spacing:0.08em; margin:18px 0 6px;">實作細節</h5>
     <ul style="margin:6px 0 8px 20px;">
-      <li><code>INCR</code> on <code>quota:YYYY-MM-DD</code> &mdash; atomic, cross-worker</li>
-      <li>Runs only on cache misses inside the lock &mdash; cached responses never touch the counter</li>
-      <li>Cap is exactly 1,000 (not lower) because <code>INCR</code> is atomic &mdash; no way to overshoot</li>
+      <li>對 <code>quota:YYYY-MM-DD</code> 執行 <code>INCR</code> &mdash; 原子操作，跨 worker</li>
+      <li>只在 lock 內的 cache miss 時執行 &mdash; cache 命中的回應不觸碰計數器</li>
+      <li>上限精確設為 1,000（不更低），因為 <code>INCR</code> 是原子操作 &mdash; 不可能超出</li>
     </ul>
 
-    <h5 style="color:#94a3b8; text-transform:uppercase; font-size:0.78rem; letter-spacing:0.08em; margin:18px 0 6px;">Hardening</h5>
+    <h5 style="color:#94a3b8; text-transform:uppercase; font-size:0.78rem; letter-spacing:0.08em; margin:18px 0 6px;">強化設計</h5>
     <ul style="margin:6px 0 8px 20px;">
-      <li><b>Counter survives restart</b> &mdash; Redis AOF persistence + persistent volume. Without this, a Redis restart wipes the counter and the cap could be exceeded across restarts.</li>
-      <li><b>Refund never goes negative</b> &mdash; <code>refund_quota!</code> wraps DECR in a Lua script that only runs when counter is above zero. Without this, burst 401s before any INCR would push counter negative, letting subsequent INCRs silently exceed 1,000.</li>
+      <li><b>計數器在重啟後存活</b> &mdash; Redis AOF 持久化 + persistent volume。沒有這個，Redis 重啟會清空計數器，跨重啟的上限可能被超出。</li>
+      <li><b>退款不會變負數</b> &mdash; <code>refund_quota!</code> 將 DECR 包在 Lua script 中，只在計數器大於零時執行。沒有這個，在任何 INCR 之前爆發的 401 會把計數器推成負數，讓後續的 INCR 悄悄超出 1,000。</li>
     </ul>
 
-    <h5 style="color:#94a3b8; text-transform:uppercase; font-size:0.78rem; letter-spacing:0.08em; margin:18px 0 6px;">Assumption</h5>
-    <p>Quota resets at <span class="highlight">UTC midnight</span>. The upstream docs don't specify when the daily limit resets, so we assume UTC 00:00. The Redis key uses <code>quota:YYYY-MM-DD</code> (UTC) and <code>Retry-After</code> counts seconds until UTC midnight. If the actual reset time differs, only these two values need updating.</p>
+    <h5 style="color:#94a3b8; text-transform:uppercase; font-size:0.78rem; letter-spacing:0.08em; margin:18px 0 6px;">假設</h5>
+    <p>配額在 <span class="highlight">UTC 午夜</span>重置。Upstream 文件沒有說明每日限制何時重置，所以我們假設 UTC 00:00。Redis key 使用 <code>quota:YYYY-MM-DD</code>（UTC），<code>Retry-After</code> 計算到 UTC 午夜的秒數。如果實際重置時間不同，只需更新這兩個值。</p>
   </div>
 </div>
 
@@ -868,54 +868,54 @@ token = SecureRandom.uuid                              <span class="comment">// 
     <div class="decision-arrow">&#9656;</div>
   </div>
   <div class="decision-body">
-    <p>When a dependency dies (Redis, upstream, lock), what should the service do? There are four common strategies — each with a different priority.</p>
+    <p>當依賴項目掛掉（Redis、upstream、lock），服務應該怎麼辦？有四種常見策略 — 每種優先順序不同。</p>
 
     <table style="margin: 14px 0;">
       <thead>
-        <tr><th>Strategy</th><th>What it does</th><th>Protects</th><th>Sacrifices</th></tr>
+        <tr><th>策略</th><th>行為</th><th>保護</th><th>犧牲</th></tr>
       </thead>
       <tbody>
         <tr style="background:#10b98115;">
-          <td><b style="color:#10b981;">✓ Fail-closed</b><br><span style="font-size:0.82rem; color:#94a3b8;">My choice</span></td>
-          <td>Dependency dies → return 5xx, never call upstream</td>
-          <td>Upstream contract (1000/day cap)</td>
-          <td>Own service uptime</td>
+          <td><b style="color:#10b981;">✓ Fail-closed</b><br><span style="font-size:0.82rem; color:#94a3b8;">我的選擇</span></td>
+          <td>依賴掛掉 → 回傳 5xx，永不打 upstream</td>
+          <td>Upstream 合約（1,000/天上限）</td>
+          <td>自身服務可用性</td>
         </tr>
         <tr>
           <td>Fail-open</td>
-          <td>Dependency dies → bypass protection, hit upstream directly</td>
-          <td>Own uptime</td>
-          <td>Quota burns fast; thundering herd unblocked</td>
+          <td>依賴掛掉 → 繞過保護，直接打 upstream</td>
+          <td>自身可用性</td>
+          <td>配額快速耗盡；thundering herd 無法阻擋</td>
         </tr>
         <tr>
           <td>Graceful degradation</td>
-          <td>Return stale cache, default value, or partial response</td>
-          <td>User experience</td>
-          <td>Data freshness / correctness</td>
+          <td>回傳過期 cache、預設值或部分回應</td>
+          <td>使用者體驗</td>
+          <td>資料即時性 / 正確性</td>
         </tr>
         <tr>
           <td>Fail-fast + retry</td>
-          <td>Return 5xx, expect client to retry with backoff</td>
-          <td>Same as fail-closed but pushes retry to caller</td>
-          <td>Assumes well-behaved client</td>
+          <td>回傳 5xx，預期客戶端以 backoff 重試</td>
+          <td>與 fail-closed 相同，但將重試責任推給呼叫方</td>
+          <td>假設客戶端行為良好</td>
         </tr>
       </tbody>
     </table>
 
-    <p><b>Why fail-closed for this service:</b> two spec rules forced it.</p>
+    <p><b>為什麼這個服務選 fail-closed：</b>兩條規範要求強迫了這個選擇。</p>
     <ol style="margin-left:20px;">
-      <li><b>"Rate must be no older than 5 minutes"</b> → can't return stale data → rules out graceful degradation.</li>
-      <li><b>"1,000 calls/day per token" (hard contract)</b> → can't let failures leak through to upstream → rules out fail-open.</li>
+      <li><b>「房價資料不得超過 5 分鐘」</b> → 不能回傳過期資料 → 排除 graceful degradation。</li>
+      <li><b>「每個 token 每天 1,000 次」（硬性合約）</b> → 不能讓失敗滲透到 upstream → 排除 fail-open。</li>
     </ol>
-    <p>Once those two are eliminated, fail-closed is the only honest choice. Fail-fast + retry is functionally equivalent but offloads correctness to the client; for a proxy, owning that responsibility is cleaner.</p>
+    <p>排除這兩個後，fail-closed 是唯一誠實的選擇。Fail-fast + retry 功能上等效，但將正確性責任轉嫁給客戶端；對 proxy 來說，自己承擔這個責任更乾淨。</p>
 
-    <p><b>When I'd choose differently:</b></p>
+    <p><b>我會選擇不同策略的情況：</b></p>
     <ul style="margin-left:20px;">
-      <li><b>Recommendation API</b> — graceful degradation. Returning popular items is better than no items.</li>
-      <li><b>Like / view counter</b> — fail-open. A few extra writes is harmless.</li>
-      <li><b>Internal analytics dashboard</b> — fail-open with a banner. Operators can judge stale data themselves.</li>
+      <li><b>推薦 API</b> — graceful degradation。回傳熱門內容比什麼都不回傳更好。</li>
+      <li><b>按讚 / 瀏覽計數器</b> — fail-open。多幾次寫入無傷大雅。</li>
+      <li><b>內部分析 dashboard</b> — 帶提示的 fail-open。操作人員能自行判斷過期資料。</li>
     </ul>
-    <p>The right choice always depends on whether <b>"wrong data" or "no data" is more harmful</b>. For pricing, wrong data wins.</p>
+    <p>正確的選擇永遠取決於<b>「錯誤資料」還是「沒有資料」傷害更大</b>。對定價來說，錯誤資料的代價更高。</p>
   </div>
 </div>
 
@@ -931,32 +931,32 @@ token = SecureRandom.uuid                              <span class="comment">// 
     <div class="comparison">
       <div class="side before">
         <h4>&#10007; Before</h4>
-        <p style="font-size:0.92rem;">Every upstream failure — 401, 5xx, timeout — returned <code>400 Bad Request</code>. The client had no way to distinguish a bad request from a server-side failure.</p>
+        <p style="font-size:0.92rem;">所有 upstream 失敗 — 401、5xx、timeout — 都回傳 <code>400 Bad Request</code>。客戶端無法區分請求本身有問題還是伺服器端失敗。</p>
       </div>
       <div class="side after">
         <h4>&#10003; After</h4>
-        <p style="font-size:0.92rem;">Each failure maps to a distinct HTTP status. The client knows exactly what happened and whether to fix the request, retry, or escalate.</p>
+        <p style="font-size:0.92rem;">每種失敗對應不同的 HTTP 狀態碼。客戶端清楚知道發生了什麼，以及該修正請求、重試還是升級處理。</p>
       </div>
     </div>
 
     <div class="finding info" style="margin-bottom:18px;">
-      <div class="finding-title">Why this matters — upstream has high failure rates</div>
+      <div class="finding-title">為什麼重要 — upstream 失敗率極高</div>
       <div class="finding-row"><span class="finding-label">~7%</span><span class="finding-value">HTTP 500 from upstream</span></div>
       <div class="finding-row"><span class="finding-label">~7%</span><span class="finding-value">Timeout</span></div>
       <div class="finding-row"><span class="finding-label">~7%</span><span class="finding-value">HTTP 200 with error body <code style="font-size:0.82rem;">{"message":"Failed to process rates...","status":"error"}</code></span></div>
       <div class="finding-row"><span class="finding-label">~7%</span><span class="finding-value">HTTP 200 with <code>rate</code> field missing from response</span></div>
-      <p style="margin-top:10px; margin-bottom:0; font-size:0.88rem; color:#64748b;">From 1,001 live test calls — see <code>UPSTREAM_BEHAVIOR.md</code> for full pattern tables.</p>
+      <p style="margin-top:10px; margin-bottom:0; font-size:0.88rem; color:#64748b;">來自 1,001 次真實測試呼叫 — 完整模式表格見 <code>UPSTREAM_BEHAVIOR.md</code>。</p>
     </div>
 
-    <p><span style="display:inline-block; background:#38bdf820; color:#38bdf8; border:1px solid #38bdf8; border-radius:5px; padding:2px 12px; font-weight:700; font-size:0.95rem; letter-spacing:0.03em;">Anti-Corruption Layer (ACL)</span> &nbsp;<code>RateApiClient</code> absorbs all upstream quirks and exposes a clean typed interface. <code>PricingService</code> never touches a raw HTTP response:</p>
+    <p><span style="display:inline-block; background:#38bdf820; color:#38bdf8; border:1px solid #38bdf8; border-radius:5px; padding:2px 12px; font-weight:700; font-size:0.95rem; letter-spacing:0.03em;">Anti-Corruption Layer (ACL)</span> &nbsp;<code>RateApiClient</code> 吸收所有 upstream 的不穩定行為，對外暴露乾淨的型別化介面。<code>PricingService</code> 永遠不會直接接觸原始 HTTP 回應：</p>
 
     <div class="flow" style="margin: 18px 0;">
 
       <!-- Chaos zone -->
       <div style="background:#ef444420; border:2px solid #ef4444; border-radius:8px; padding:14px 24px; text-align:center; min-width:400px;">
-        <div style="font-size:0.72rem; color:#ef444490; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px;">&#9888; unstable, unpredictable</div>
+        <div style="font-size:0.72rem; color:#ef444490; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px;">&#9888; 不穩定、不可預測</div>
         <div style="font-size:1rem; font-weight:700; color:#ef4444;">upstream rate-api</div>
-        <div class="detail" style="color:#ef444480;">runs expensive ML inference; ~28% failure rate — 5xx &nbsp;·&nbsp; timeout &nbsp;·&nbsp; HTTP 200 with error body &nbsp;·&nbsp; HTTP 200 with missing rate field</div>
+        <div class="detail" style="color:#ef444480;">執行昂貴的 ML 推論；~28% 失敗率 — 5xx &nbsp;·&nbsp; timeout &nbsp;·&nbsp; HTTP 200 帶錯誤 body &nbsp;·&nbsp; HTTP 200 但缺少 rate 欄位</div>
       </div>
 
       <div class="flow-arrow">&#9660;</div>
@@ -965,7 +965,7 @@ token = SecureRandom.uuid                              <span class="comment">// 
       <div style="background:#38bdf818; border:2px solid #38bdf8; border-radius:8px; padding:14px 24px; text-align:center; min-width:400px; box-shadow:0 0 18px #38bdf825;">
         <div style="margin-bottom:8px;"><span style="font-size:0.88rem; font-weight:800; color:#38bdf8; background:#0f172a; border:2px solid #38bdf8; border-radius:5px; padding:4px 14px; letter-spacing:0.06em; box-shadow:0 0 10px #38bdf850;">Anti-Corruption Layer</span></div>
         <div style="font-size:1.05rem; font-weight:800; color:#38bdf8;">RateApiClient</div>
-        <div class="detail" style="color:#38bdf8cc; margin-bottom:4px;">makes HTTP call &nbsp;·&nbsp; parses response &nbsp;·&nbsp; returns clean <code style="color:#38bdf8;">Integer</code> on success</div>
+        <div class="detail" style="color:#38bdf8cc; margin-bottom:4px;">發出 HTTP 呼叫 &nbsp;·&nbsp; 解析回應 &nbsp;·&nbsp; 成功時回傳乾淨的 <code style="color:#38bdf8;">Integer</code></div>
         <div class="detail"><span style="color:#38bdf880;">any failure → typed exception: UnauthorizedError &nbsp;·&nbsp; QuotaExhaustedError &nbsp;·&nbsp; TimeoutError &nbsp;·&nbsp; UpstreamError</span></div>
       </div>
 
@@ -974,34 +974,34 @@ token = SecureRandom.uuid                              <span class="comment">// 
       <!-- PricingService — secondary -->
       <div style="background:#1e293b; border:1px solid #334155; border-radius:8px; padding:12px 24px; text-align:center; min-width:400px;">
         <div style="font-size:0.95rem; font-weight:600; color:#94a3b8;">PricingService</div>
-        <div class="detail" style="color:#64748b;">orchestrates cache → lock → quota → fetch; never touches raw HTTP; catches each typed exception and assembles the correct HTTP status + client message</div>
+        <div class="detail" style="color:#64748b;">協調 cache → lock → quota → fetch；不直接接觸原始 HTTP；捕捉每種型別化例外並組合正確的 HTTP 狀態碼 + 客戶端訊息</div>
       </div>
 
       <div class="flow-arrow" style="color:#475569;">&#9660;</div>
 
       <div style="background:#1e293b; border:1px solid #334155; border-radius:8px; padding:12px 24px; text-align:center; min-width:400px;">
         <div style="font-size:0.95rem; font-weight:600; color:#94a3b8;">Controller</div>
-        <div class="detail" style="color:#64748b;">validates params (period &nbsp;·&nbsp; hotel &nbsp;·&nbsp; room); renders the JSON response with status from PricingService</div>
+        <div class="detail" style="color:#64748b;">驗證參數（period &nbsp;·&nbsp; hotel &nbsp;·&nbsp; room）；根據 PricingService 的狀態渲染 JSON 回應</div>
       </div>
 
     </div>
 
     <table>
-      <thead><tr><th>Situation</th><th>Who raises</th><th>Client status</th><th>Client message</th><th>Client action</th></tr></thead>
+      <thead><tr><th>情境</th><th>誰拋出</th><th>客戶端狀態碼</th><th>客戶端訊息</th><th>客戶端動作</th></tr></thead>
       <tbody>
-        <tr><td>Invalid params</td><td>Controller</td><td><span class="status-badge s-400">400</span></td><td>Missing required parameters / Invalid period</td><td>Fix request</td></tr>
-        <tr><td>Daily quota used up</td><td>QuotaGuard</td><td><span class="status-badge s-429">429</span></td><td>Daily quota reached — requests resume at midnight UTC</td><td>Wait for Retry-After</td></tr>
-        <tr><td>Upstream returns HTTP 429 (token limit)</td><td>RateApiClient</td><td><span class="status-badge s-429">429</span></td><td>Upstream API quota exhausted — token limit reached</td><td>Wait for Retry-After</td></tr>
-        <tr><td>Bad token (401)</td><td>RateApiClient</td><td><span class="status-badge s-502">502</span></td><td>Upstream authentication failed</td><td>—</td></tr>
-        <tr><td>Upstream 200 with error body</td><td>RateApiClient</td><td><span class="status-badge s-502">502</span></td><td>Upstream error</td><td>—</td></tr>
-        <tr><td>Upstream 200, rate field absent</td><td>RateApiClient</td><td><span class="status-badge s-502">502</span></td><td>Upstream error</td><td>—</td></tr>
+        <tr><td>無效參數</td><td>Controller</td><td><span class="status-badge s-400">400</span></td><td>Missing required parameters / Invalid period</td><td>修正請求</td></tr>
+        <tr><td>每日配額耗盡</td><td>QuotaGuard</td><td><span class="status-badge s-429">429</span></td><td>Daily quota reached — requests resume at midnight UTC</td><td>等待 Retry-After</td></tr>
+        <tr><td>Upstream 回傳 HTTP 429（token 限制）</td><td>RateApiClient</td><td><span class="status-badge s-429">429</span></td><td>Upstream API quota exhausted — token limit reached</td><td>等待 Retry-After</td></tr>
+        <tr><td>無效 token（401）</td><td>RateApiClient</td><td><span class="status-badge s-502">502</span></td><td>Upstream authentication failed</td><td>—</td></tr>
+        <tr><td>Upstream 200 但 body 為錯誤</td><td>RateApiClient</td><td><span class="status-badge s-502">502</span></td><td>Upstream error</td><td>—</td></tr>
+        <tr><td>Upstream 200 但缺少 rate 欄位</td><td>RateApiClient</td><td><span class="status-badge s-502">502</span></td><td>Upstream error</td><td>—</td></tr>
         <tr><td>Upstream 5xx</td><td>RateApiClient</td><td><span class="status-badge s-502">502</span></td><td>Upstream error</td><td>—</td></tr>
-        <tr><td>Upstream timeout</td><td>RateApiClient</td><td><span class="status-badge s-504">504</span></td><td>Upstream timed out</td><td>—</td></tr>
-        <tr><td>Follower waited too long</td><td>LockAndFetchRate</td><td><span class="status-badge s-504">504</span></td><td>Request timed out waiting for upstream result</td><td>—</td></tr>
-        <tr><td>Unexpected error</td><td>StandardError catch-all</td><td><span class="status-badge s-500">500</span></td><td>Unexpected error</td><td>—</td></tr>
+        <tr><td>Upstream 逾時</td><td>RateApiClient</td><td><span class="status-badge s-504">504</span></td><td>Upstream timed out</td><td>—</td></tr>
+        <tr><td>Follower 等待逾時</td><td>LockAndFetchRate</td><td><span class="status-badge s-504">504</span></td><td>Request timed out waiting for upstream result</td><td>—</td></tr>
+        <tr><td>非預期錯誤</td><td>StandardError catch-all</td><td><span class="status-badge s-500">500</span></td><td>非預期錯誤</td><td>—</td></tr>
       </tbody>
     </table>
-    <p>Both 429 responses include a <code>Retry-After</code> header (seconds until UTC midnight). All other error responses return only the status code and message — no retry guidance is provided.</p>
+    <p>兩種 429 回應都包含 <code>Retry-After</code> header（到 UTC 午夜的秒數）。其他所有錯誤回應只回傳狀態碼和訊息 — 不提供重試指引。</p>
   </div>
 </div>
 
@@ -1013,12 +1013,12 @@ token = SecureRandom.uuid                              <span class="comment">// 
     <div class="decision-arrow">&#9656;</div>
   </div>
   <div class="decision-body">
-    <p>Every request emits a single JSON log line with: <code>method</code>, <code>path</code>, <code>status</code>, <code>duration</code>, <code>cache_status</code> (<code>"hit"</code> or <code>"miss"</code>), and <code>upstream_latency_ms</code>.</p>
+    <p>每個請求輸出一行 JSON log，包含：<code>method</code>、<code>path</code>、<code>status</code>、<code>duration</code>、<code>cache_status</code>（<code>"hit"</code> 或 <code>"miss"</code>）和 <code>upstream_latency_ms</code>。</p>
     <pre><span class="comment">// Example log line:</span>
 {"method":"GET","path":"/api/v1/pricing","status":<span class="number">200</span>,"duration":<span class="number">12.3</span>,
  "cache_status":"<span class="string">hit</span>","upstream_latency_ms":<span class="keyword">null</span>}</pre>
-    <p><b>Why Lograge over paid services (Datadog, New Relic):</b> Lograge is free, zero config, and ships with Rails. For a case study like this, structured JSON logs are enough to prove the observability mindset. In production, these same JSON lines can be piped into any log aggregator.</p>
-    <p><b>Why this matters:</b> "How would you know this service is healthy in production?" has a concrete answer — filter by <code>cache_status=miss</code>, watch <code>upstream_latency_ms</code>.</p>
+    <p><b>為什麼選 Lograge 而不是付費服務（Datadog、New Relic）：</b>Lograge 免費、零設定，隨 Rails 提供。對這樣的案例研究，結構化 JSON log 足以展示可觀測性的思維。在 production 環境中，這些 JSON 行可以直接導入任何 log 聚合器。</p>
+    <p><b>為什麼重要：</b>「你怎麼知道這個服務在 production 是健康的？」有了具體答案 — 篩選 <code>cache_status=miss</code>，觀察 <code>upstream_latency_ms</code>。</p>
   </div>
 </div>
 
@@ -1030,8 +1030,8 @@ token = SecureRandom.uuid                              <span class="comment">// 
     <div class="decision-arrow">&#9656;</div>
   </div>
   <div class="decision-body">
-    <p>All test files follow a consistent section structure: <b>Happy path &rarr; Fail path &rarr; Edge/Boundary &rarr; Isolation</b>. Coverage measured with SimpleCov — currently <span class="highlight">100%</span> (scaffold files excluded).</p>
-    <p><b>Why WebMock over .stub:</b> Stubbing <code>RateApiClient.get_all_rates</code> directly bypasses the HTTP layer, hiding timeout, header, and retry behaviour. WebMock intercepts at the socket layer, producing more realistic tests.</p>
+    <p>所有測試檔案遵循一致的段落結構：<b>Happy path &rarr; Fail path &rarr; Edge/Boundary &rarr; Isolation</b>。用 SimpleCov 量測覆蓋率 — 目前 <span class="highlight">100%</span>（排除 scaffold 檔案）。</p>
+    <p><b>為什麼選 WebMock 而不是 .stub：</b>直接 stub <code>RateApiClient.get_all_rates</code> 會繞過 HTTP 層，隱藏 timeout、header 和 retry 行為。WebMock 在 socket 層攔截，產生更真實的測試。</p>
   </div>
 </div>
 </section>
@@ -1047,74 +1047,74 @@ token = SecureRandom.uuid                              <span class="comment">// 
   </thead>
   <tbody>
     <tr>
-      <td><b>Redis fully down</b><br><span style="font-size:0.82rem; color:#94a3b8;">e.g. crash, OOM, network partition</span></td>
-      <td>Rails' built-in cache error handler swallows the Redis error and returns nil &rarr; <code>Rails.cache.write(..., unless_exist: true)</code> returns nil &rarr; LockAndFetchRate falls into the follower branch &rarr; <code>poll_for_result</code> sees nil for 6s &rarr; raises <code>LockAndFetchRate::TimeoutError</code></td>
+      <td><b>Redis 完全停機</b><br><span style="font-size:0.82rem; color:#94a3b8;">例如崩潰、OOM、網路分區</span></td>
+      <td>Rails 內建的 cache 錯誤處理器吞掉 Redis 錯誤並回傳 nil &rarr; <code>Rails.cache.write(..., unless_exist: true)</code> 回傳 nil &rarr; LockAndFetchRate 進入 follower 分支 &rarr; <code>poll_for_result</code> 看到 nil 持續 6s &rarr; 拋出 <code>LockAndFetchRate::TimeoutError</code></td>
       <td><span class="status-badge s-504">504</span> "Request timed out waiting for upstream result"</td>
-      <td><b style="color:#10b981;">0 calls</b> &mdash; no one acquires the lock, so upstream is never reached</td>
-      <td>Service recovers immediately when Redis comes back online (verified by the <a href="#verified">Fail-closed when Redis dies</a> test in Load &amp; Chaos Tests)</td>
+      <td><b style="color:#10b981;">0 次</b> &mdash; 無人取得 lock，upstream 永遠不會被觸及</td>
+      <td>Redis 恢復後服務立即回復（已由壓力與混沌測試中的 <a href="#verified">Redis 崩潰時 fail-closed</a> 測試驗證）</td>
     </tr>
     <tr>
-      <td><b>Redis restart</b><br><span style="font-size:0.82rem; color:#94a3b8;">e.g. deploy, OOM, container restart</span></td>
-      <td>AOF replays everything back — cache, lock, counter — with their original expiry times. Stale lock self-expires within 7s (same as leader crash); cache stays inside the 5-min freshness window; counter resumes counting. Up to ~1s of writes may be lost (<code>appendfsync everysec</code> default).</td>
-      <td>Brief unavailability during restart (a few seconds); reads resume normally after AOF replay</td>
-      <td><b style="color:#10b981;">0 calls</b> &mdash; cache and counter both survive; nothing extra to fetch</td>
-      <td>Self-healing via AOF + persistent volume. The 1000/day cap holds <b>across restarts</b>, not just within a single uptime.</td>
+      <td><b>Redis 重啟</b><br><span style="font-size:0.82rem; color:#94a3b8;">例如部署、OOM、容器重啟</span></td>
+      <td>AOF 重播所有資料 — cache、lock、計數器 — 保留原本的到期時間。過期 lock 在 7s 內自動過期（與 leader 崩潰相同）；cache 維持在 5 分鐘的有效窗口內；計數器繼續計數。最多 ~1s 的寫入可能遺失（<code>appendfsync everysec</code> 預設值）。</td>
+      <td>重啟期間短暫不可用（幾秒鐘）；AOF 重播後恢復正常讀取</td>
+      <td><b style="color:#10b981;">0 次</b> &mdash; cache 和計數器都存活；不需要額外取資料</td>
+      <td>透過 AOF + persistent volume 自我修復。1,000/天上限<b>跨重啟</b>仍然成立，不只是在單次運行期間。</td>
     </tr>
     <tr>
-      <td><b>Leader crashes mid-fetch</b><br><span style="font-size:0.82rem; color:#94a3b8;">e.g. <code>kill -9</code>, OOM, container restart</span></td>
-      <td><code>ensure</code> never runs &rarr; lock stays held until 7s auto-expire &rarr; followers wait then time out at 6s. <b style="color:#f59e0b;">Each leader holds a unique UUID (fencing token)</b>, so a slow leader waking up after expiry won't accidentally delete the new leader's lock.</td>
+      <td><b>Leader 在取資料中途崩潰</b><br><span style="font-size:0.82rem; color:#94a3b8;">例如 <code>kill -9</code>、OOM、容器重啟</span></td>
+      <td><code>ensure</code> 不會執行 &rarr; lock 保持持有直到 7s 自動過期 &rarr; followers 等待並在 6s 時超時。<b style="color:#f59e0b;">每個 leader 持有唯一的 UUID（fencing token）</b>，因此一個在過期後才醒來的緩慢 leader 不會意外刪除新 leader 的 lock。</td>
       <td><span class="status-badge s-504">504</span> "Request timed out waiting for upstream result"</td>
-      <td><b style="color:#10b981;">≤1 call</b> &mdash; 0 if leader crashed before calling upstream, 1 if it crashed during or after</td>
-      <td>Wait up to 7s for the lock to auto-expire (that's the lock TTL). Then the next request takes over as new leader.</td>
+      <td><b style="color:#10b981;">≤1 次</b> &mdash; leader 在打 upstream 前崩潰為 0 次，期間或之後崩潰為 1 次</td>
+      <td>等待最多 7s 讓 lock 自動過期（即 lock TTL）。之後下一個請求成為新的 leader。</td>
     </tr>
     <tr>
-      <td><b>Upstream timeout</b><br><span style="font-size:0.82rem; color:#94a3b8;">5s HTTPParty timeout (~7%)</span></td>
-      <td>RateApiClient catches <code>Net::ReadTimeout</code>, raises TimeoutError &rarr; lock released</td>
+      <td><b>Upstream 逾時</b><br><span style="font-size:0.82rem; color:#94a3b8;">5s HTTParty timeout（~7%）</span></td>
+      <td>RateApiClient 捕捉 <code>Net::ReadTimeout</code>，拋出 TimeoutError &rarr; 釋放 lock</td>
       <td><span class="status-badge s-504">504</span> "Upstream timed out"</td>
-      <td><b style="color:#10b981;">1 call</b> &mdash; quota consumed for the failed attempt</td>
-      <td>Next request becomes new leader and retries upstream.</td>
+      <td><b style="color:#10b981;">1 次</b> &mdash; 失敗的嘗試消耗了配額</td>
+      <td>下一個請求成為新的 leader 並重試 upstream。</td>
     </tr>
     <tr>
-      <td><b>Upstream HTTP 5xx</b><br><span style="font-size:0.82rem; color:#94a3b8;">~7% rate observed in <a href="upstream_behavior.html">live testing</a></span></td>
-      <td>RateApiClient sees non-200 status, raises UpstreamError &rarr; lock released, cache not written</td>
+      <td><b>Upstream HTTP 5xx</b><br><span style="font-size:0.82rem; color:#94a3b8;">~7% 機率，來自<a href="upstream_behavior.html">真實測試</a></span></td>
+      <td>RateApiClient 看到非 200 狀態，拋出 UpstreamError &rarr; 釋放 lock，不寫入 cache</td>
       <td><span class="status-badge s-502">502</span> "Upstream error"</td>
-      <td><b style="color:#10b981;">1 call</b> &mdash; quota consumed for the failed attempt</td>
-      <td>Next request becomes new leader and retries upstream.</td>
+      <td><b style="color:#10b981;">1 次</b> &mdash; 失敗的嘗試消耗了配額</td>
+      <td>下一個請求成為新的 leader 並重試 upstream。</td>
     </tr>
     <tr>
-      <td><b>Upstream returns 200 with error body</b><br><span style="font-size:0.82rem; color:#94a3b8;">~7% rate observed in <a href="upstream_behavior.html">live testing</a></span></td>
-      <td>RateApiClient parses body, sees no <code>rate</code> field, raises UpstreamError &rarr; lock released, cache not written</td>
+      <td><b>Upstream 回傳 200 但 body 為錯誤</b><br><span style="font-size:0.82rem; color:#94a3b8;">~7% 機率，來自<a href="upstream_behavior.html">真實測試</a></span></td>
+      <td>RateApiClient 解析 body，發現沒有 <code>rate</code> 欄位，拋出 UpstreamError &rarr; 釋放 lock，不寫入 cache</td>
       <td><span class="status-badge s-502">502</span> "Upstream error"</td>
-      <td><b style="color:#10b981;">1 call burned</b> &mdash; but we deliberately don't cache the bad response. Next request retries, no stale garbage stuck in cache.</td>
-      <td>Next request becomes new leader and retries upstream.</td>
+      <td><b style="color:#10b981;">消耗 1 次</b> &mdash; 但我們刻意不 cache 錯誤回應。下一個請求重試，cache 中不會留下過期的垃圾資料。</td>
+      <td>下一個請求成為新的 leader 並重試 upstream。</td>
     </tr>
     <tr>
-      <td><b>Upstream returns garbage values</b><br><span style="font-size:0.82rem; color:#94a3b8;">unknown hotel, zero/negative rate, decimal strings, missing fields</span></td>
-      <td>RateApiClient runs each record through a <b style="color:#f59e0b;">dry-schema</b> + positive-numeric check. Bad records are logged and skipped; the rest still get cached.</td>
-      <td>Service still returns the requested rate if it survived validation, otherwise <span class="status-badge s-502">502</span></td>
+      <td><b>Upstream 回傳垃圾值</b><br><span style="font-size:0.82rem; color:#94a3b8;">未知飯店、零或負數房價、小數字串、缺少欄位</span></td>
+      <td>RateApiClient 對每筆記錄執行 <b style="color:#f59e0b;">dry-schema</b> + 正數檢查。壞記錄被記錄並跳過；其餘仍然被 cache。</td>
+      <td>若請求的房價通過驗證，服務仍回傳該值；否則回傳 <span class="status-badge s-502">502</span></td>
       <td><b style="color:#10b981;">1 call</b> &mdash; partial response still better than zero</td>
-      <td>One bad row doesn't deny cache to 35 good rows. If <i>every</i> record is invalid the whole response is rejected.</td>
+      <td>一筆壞資料不會讓 35 筆好資料也無法被 cache。如果<i>所有</i>記錄都無效，整個回應才會被拒絕。</td>
     </tr>
     <tr>
-      <td><b>Upstream 401 (auth failure)</b><br><span style="font-size:0.82rem; color:#94a3b8;">e.g. token rotation needed</span></td>
-      <td>RateApiClient raises UnauthorizedError &rarr; PricingService catches &rarr; <b>refunds the quota unit</b> (the call was rejected before processing)</td>
+      <td><b>Upstream 401（驗證失敗）</b><br><span style="font-size:0.82rem; color:#94a3b8;">例如需要更換 token</span></td>
+      <td>RateApiClient 拋出 UnauthorizedError &rarr; PricingService 捕捉 &rarr; <b>退還配額單位</b>（呼叫在處理前就被拒絕）</td>
       <td><span class="status-badge s-502">502</span> "Upstream authentication failed"</td>
-      <td><b style="color:#10b981;">1 call but quota refunded</b> &mdash; <code>QuotaGuard.refund_quota!</code> ensures bad tokens don't burn budget</td>
-      <td>Operator must rotate token. Until then, every cache miss costs 1 quota then refunds &mdash; budget stays intact.</td>
+      <td><b style="color:#10b981;">1 次但配額已退還</b> &mdash; <code>QuotaGuard.refund_quota!</code> 確保無效 token 不會消耗預算</td>
+      <td>操作人員必須更換 token。在此之前，每次 cache miss 消耗 1 個配額然後退還 &mdash; 預算保持完整。</td>
     </tr>
     <tr>
-      <td><b>Upstream HTTP 429 (their rate limit)</b><br><span style="font-size:0.82rem; color:#94a3b8;">~0.1% observed — upstream's daily limit hit</span></td>
-      <td>RateApiClient raises QuotaExhaustedError &rarr; PricingService catches</td>
+      <td><b>Upstream HTTP 429（他們的 rate limit）</b><br><span style="font-size:0.82rem; color:#94a3b8;">~0.1% 機率 — upstream 每日上限已達</span></td>
+      <td>RateApiClient 拋出 QuotaExhaustedError &rarr; PricingService 捕捉</td>
       <td><span class="status-badge s-429">429</span> + <code>Retry-After</code> header</td>
-      <td><b style="color:#10b981;">1 call</b> &mdash; rejected call still counts upstream-side</td>
-      <td>Wait until upstream's window resets (assumed UTC midnight, see D4). Our QuotaGuard catches the same condition locally before the call — this row is the rare race where our counter and upstream's diverge.</td>
+      <td><b style="color:#10b981;">1 次</b> &mdash; 被拒絕的呼叫在 upstream 端仍計入</td>
+      <td>等待 upstream 的窗口重置（假設 UTC 午夜，見決策 4）。我們的 QuotaGuard 在呼叫前就在本地捕捉相同條件 — 這一行是我們的計數器與 upstream 計數器偶爾出現差異的罕見競態。</td>
     </tr>
     <tr>
-      <td><b>Quota counter at 1000</b><br><span style="font-size:0.82rem; color:#94a3b8;">budget exhausted for the day</span></td>
-      <td>QuotaGuard's atomic INCR returns 1001 &rarr; raises ExhaustedError <b>before</b> RateApiClient is called</td>
+      <td><b>配額計數器達到 1,000</b><br><span style="font-size:0.82rem; color:#94a3b8;">當日預算耗盡</span></td>
+      <td>QuotaGuard 的原子 INCR 回傳 1001 &rarr; 在 RateApiClient 被呼叫<b>之前</b>拋出 ExhaustedError</td>
       <td><span class="status-badge s-429">429</span> + <code>Retry-After</code> header (seconds until UTC midnight)</td>
-      <td><b style="color:#10b981;">0 calls</b> &mdash; the deterministic guarantee that 1000 is never exceeded (verified by the <a href="#verified">Quota hard cap</a> test in Load &amp; Chaos Tests)</td>
-      <td>Counter auto-resets at UTC midnight via <code>EXPIREAT</code>. <b>Users hitting cache still get their rate</b> — only fresh fetches get blocked.</td>
+      <td><b style="color:#10b981;">0 次</b> &mdash; 確定性保證 1,000 永遠不會被超出（已由壓力與混沌測試中的<a href="#verified">配額硬性上限</a>測試驗證）</td>
+      <td>計數器透過 <code>EXPIREAT</code> 在 UTC 午夜自動重置。<b>命中 cache 的使用者仍能取得房價</b> — 只有需要重新取資料的請求會被阻擋。</td>
     </tr>
   </tbody>
 </table>
@@ -1133,20 +1133,20 @@ token = SecureRandom.uuid                              <span class="comment">// 
 
 <div class="finding danger">
   <div class="finding-title" style="font-size:1.08rem;font-weight:700;color:#f1f5f9;">HTTP 200 不代表成功</div>
-  <div class="finding-row"><span class="finding-label">Finding</span><span class="finding-value">Upstream returns <span class="status-badge s-200">200</span> for three distinct failure modes: error body with no <code>rates</code> key (~7%), <code>rate</code> field silently absent from response (~7%), and empty <code>rates</code> array. HTTP status alone cannot be trusted.</span></div>
-  <div class="finding-row"><span class="finding-label">Decision</span><span class="finding-value"><code>RateApiClient</code> inspects the response body on every 200 — each failure mode raises <code>UpstreamError</code>, never returns nil silently.</span></div>
+  <div class="finding-row"><span class="finding-label">發現</span><span class="finding-value">Upstream 在三種不同失敗模式下都回傳 <span class="status-badge s-200">200</span>：body 含錯誤且無 <code>rates</code> key（~7%）、回應中悄悄缺少 <code>rate</code> 欄位（~7%）、<code>rates</code> 陣列為空。光靠 HTTP 狀態碼無法信任。</span></div>
+  <div class="finding-row"><span class="finding-label">決策</span><span class="finding-value"><code>RateApiClient</code> 對每個 200 都檢查 response body — 每種失敗模式都拋出 <code>UpstreamError</code>，永不悄悄回傳 nil。</span></div>
 </div>
 
 <div class="finding warn">
   <div class="finding-title" style="font-size:1.08rem;font-weight:700;color:#f1f5f9;">缺少 <code>rate</code> 欄位不等於配額耗盡</div>
-  <div class="finding-row"><span class="finding-label">Finding</span><span class="finding-value">Initial design assumed a missing <code>rate</code> field meant quota was exhausted. Testing proved otherwise — the missing field is an intermittent processing error (~7% regardless of quota). Quota exhaustion has its own signal: <span class="status-badge s-429">429</span> with <code>{"error":"Rate limit exceeded (1000/day)"}</code>.</span></div>
-  <div class="finding-row"><span class="finding-label">Decision</span><span class="finding-value">Map HTTP 429 → <code>QuotaExhaustedError</code>. Map missing rate → <code>UpstreamError</code>. Two separate exceptions, two separate response paths.</span></div>
+  <div class="finding-row"><span class="finding-label">發現</span><span class="finding-value">初始設計假設缺少 <code>rate</code> 欄位代表配額耗盡。測試證明並非如此 — 缺少欄位是間歇性處理錯誤（~7%，與配額無關）。配額耗盡有自己的訊號：<span class="status-badge s-429">429</span> 加上 <code>{"error":"Rate limit exceeded (1000/day)"}</code>。</span></div>
+  <div class="finding-row"><span class="finding-label">決策</span><span class="finding-value">HTTP 429 → <code>QuotaExhaustedError</code>。缺少 rate → <code>UpstreamError</code>。兩種獨立例外，兩條獨立回應路徑。</span></div>
 </div>
 
 <div class="finding warn">
   <div class="finding-title" style="font-size:1.08rem;font-weight:700;color:#f1f5f9;">401 不消耗 upstream 配額 — 驗證失敗時退還配額</div>
-  <div class="finding-row"><span class="finding-label">Finding</span><span class="finding-value">Empirically verified: 1000 invalid-token calls followed by a valid call returned 200, not 429. Upstream rejects 401s before any processing occurs.</span></div>
-  <div class="finding-row"><span class="finding-label">Decision</span><span class="finding-value"><code>QuotaGuard</code> pre-consumes one unit before every upstream call. On 401, it refunds the unit — the request never reached upstream processing.</span></div>
+  <div class="finding-row"><span class="finding-label">發現</span><span class="finding-value">實驗驗證：1,000 次無效 token 呼叫後緊接一次有效呼叫，回傳 200 而非 429。Upstream 在任何處理發生前就拒絕 401。</span></div>
+  <div class="finding-row"><span class="finding-label">決策</span><span class="finding-value"><code>QuotaGuard</code> 在每次 upstream 呼叫前預先消耗一個單位。發生 401 時退還該單位 — 請求從未到達 upstream 的處理階段。</span></div>
 </div>
 
 <div style="margin-top:20px;text-align:center;">
