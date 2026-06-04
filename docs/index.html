@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -324,78 +324,74 @@
 
 <h1>Inference Cache Gateway</h1>
 <p class="subtitle">A Case Study in Caching & Quota Design</p>
-<p class="author">By <strong>Dane Wu</strong></p>
+<p class="author">作者：<strong>Dane Wu</strong></p>
 
 <!-- Results Hero -->
 <div class="tldr-hero">
-  <h2>Results</h2>
+  <h2>成果</h2>
   <div class="tldr-stats">
     <a href="#verified" class="tldr-stat pink" style="text-decoration:none; color:inherit; cursor:pointer;">
       <span class="num">PASS</span>
       <div class="stat-text">
-        <span class="label">All 4 Load &amp; Chaos Tests <span style="font-size:0.7rem; color:#ec4899; font-weight:700; margin-left:6px;">▸ JUMP</span></span>
-        <span class="desc">Single-flight &middot; cache hit rate &middot; quota cap &middot; fail-closed &mdash; all verified on a live stack</span>
+        <span class="label">4 項壓力與混沌測試全數通過 <span style="font-size:0.7rem; color:#ec4899; font-weight:700; margin-left:6px;">▸ 跳轉</span></span>
+        <span class="desc">Single-flight &middot; cache 命中率 &middot; 配額上限 &middot; fail-closed — 全部在真實環境驗證通過</span>
       </div>
     </a>
     <div class="tldr-stat green">
       <span class="num">0 ~ 288</span>
       <div class="stat-text">
-        <span class="label">API Calls / Day</span>
-        <span class="desc">Achieves the <b>math floor</b>: 288/day, the lowest possible under a 5-min TTL.</span>
+        <span class="label">每日 API 呼叫次數</span>
+        <span class="desc">達到理論下限：5 分鐘 TTL 條件下每日最少 288 次</span>
       </div>
     </div>
     <div class="tldr-stat yellow">
       <span class="num">36&times;</span>
       <div class="stat-text">
-        <span class="label">Quota Efficiency</span>
-        <span class="desc">1 API call fills all 36 cache entries at once</span>
+        <span class="label">配額效率</span>
+        <span class="desc">1 次 API 呼叫可填滿全部 36 個 cache 項目</span>
       </div>
     </div>
     <div class="tldr-stat blue">
       <span class="num">100%</span>
       <div class="stat-text">
-        <span class="label">Test Coverage</span>
-        <span class="desc">SimpleCov &mdash; scaffold files excluded</span>
+        <span class="label">測試覆蓋率</span>
+        <span class="desc">SimpleCov — 排除 scaffold 檔案</span>
       </div>
     </div>
     <div class="tldr-stat purple">
       <span class="num">0</span>
       <div class="stat-text">
-        <span class="label">RuboCop Offenses</span>
-        <span class="desc">Zero warnings, zero exceptions</span>
+        <span class="label">RuboCop 違規數</span>
+        <span class="desc">零警告、零例外</span>
       </div>
     </div>
   </div>
 </div>
 
-<p class="nav-hint" id="nav-hint">Click a section to jump to it.</p>
+<p class="nav-hint" id="nav-hint">點選區塊快速跳轉</p>
 <div class="nav-wrap" id="nav-wrap">
 <div class="nav-inner">
 <nav class="nav" id="nav">
   <div class="nav-group">
-    <span class="nav-group-label">Overview</span>
-    <a href="#challenge" class="idle">Challenge</a>
-    <a href="#funnel" class="idle">Solution</a>
+    <span class="nav-group-label">概覽</span>
+    <a href="#challenge" class="idle">挑戰</a>
+    <a href="#funnel" class="idle">解決方案</a>
     <a href="#architecture" class="idle">Architecture</a>
-    <a href="#quickstart" class="idle">Quick Start</a>
   </div>
   <div class="nav-group">
-    <span class="nav-group-label">Layers</span>
+    <span class="nav-group-label">各層設計</span>
     <a href="#cache" class="idle">L1 Cache</a>
     <a href="#lock" class="idle">L2 Lock</a>
     <a href="#quota" class="idle">L3 Quota</a>
     <a href="#batch" class="idle">L4 Batch</a>
-    <a href="#flow" class="idle">Request Flow</a>
+    <a href="#flow" class="idle">請求流程</a>
   </div>
   <div class="nav-group">
-    <span class="nav-group-label">Deep Dive</span>
-    <a href="#decisions" class="idle">Decisions</a>
-    <a href="#nongoals" class="idle">Non-Goals</a>
-    <a href="#failures" class="idle">Failure Modes</a>
-    <a href="#upstream" class="idle">API Findings</a>
-    <a href="#verified" class="idle">Load &amp; Chaos Tests</a>
-    <a href="#files" class="idle">File Inventory</a>
-    <a href="#ai-usage" class="idle">Agent-First Workflow</a>
+    <span class="nav-group-label">深入剖析</span>
+    <a href="#decisions" class="idle">設計決策</a>
+    <a href="#failures" class="idle">故障情境</a>
+    <a href="#upstream" class="idle">API 觀察</a>
+    <a href="#verified" class="idle">壓力與混沌測試</a>
   </div>
 </nav>
 </div>
@@ -403,29 +399,29 @@
 
 <!-- ==================== Challenge ==================== -->
 <section id="challenge">
-<h2>The Challenge</h2>
+<h2>問題背景</h2>
 
 <div style="background:linear-gradient(135deg, #78350f50, #43140730); border:1px solid #f59e0b55; padding:20px 24px; border-radius:10px; margin:0 0 18px 0; color:#cbd5e1; font-style:italic;">
-  &ldquo;Our Data and AI team built a powerful model to handle this, but its inference process is <b style="color:#ef4444;">computationally expensive</b> to run. To make this product more cost-effective, we analyzed the model's output and found that a calculated room rate remains effective for up to 5 minutes.&rdquo;
-  <div style="font-style:normal; font-size:0.82rem; color:#64748b; margin-top:6px;">— Hospitality pricing scenario</div>
+  「我們的 Data 與 AI 團隊建立了一個強大的模型來處理這項需求，但推論過程<b style="color:#ef4444;">計算成本極高</b>。為了讓產品更具成本效益，我們分析了模型的輸出，發現計算出的房價在 5 分鐘內持續有效。」
+  <div style="font-style:normal; font-size:0.82rem; color:#64748b; margin-top:6px;">— 旅宿定價場景</div>
 </div>
 
 <div class="card blue">
-  <h4>What the constraint really means</h4>
-  <p>Every upstream call burns <b style="color:#ef4444;">expensive inference compute</b>. So I scoped the goal beyond &ldquo;stay under 1,000/day&rdquo;: <span class="highlight">minimise real calls</span>. Our service must serve <b>10,000+ requests/day</b> from this 1,000/day budget.</p>
+  <h4>這個限制代表什麼</h4>
+  <p>每次打 upstream 都會消耗<b style="color:#ef4444;">昂貴的推論算力</b>。因此我把目標設得更嚴：不只是「維持在 1,000/天以下」，而是<span class="highlight">將真實呼叫次數降到最低</span>。系統必須用 1,000/天的預算服務<b>每日 10,000+ 筆請求</b>。</p>
 </div>
 
 <div class="card yellow">
-  <h4>Why cache alone isn't enough</h4>
-  <p>36 parameter combinations (4 periods &times; 3 hotels &times; 3 rooms) &times; 288 five-minute windows/day:</p>
+  <h4>為什麼光靠 cache 不夠</h4>
+  <p>36 種參數組合（4 個時段 × 3 家飯店 × 3 種房型）× 每天 288 個 5 分鐘窗口：</p>
   <div class="math">36 &times; 288 = 10,368 possible cache misses/day</div>
-  <p>Way over the 1,000-call budget. We need <b>batch fetching</b> + <b>request coalescing</b> + a <b>hard quota cap</b>.</p>
+  <p>遠超過 1,000 次的預算上限。我們需要 <b>batch fetching</b> + <b>request coalescing</b> + <b>硬性配額上限</b>。</p>
 </div>
 </section>
 
 <!-- ==================== 4 Layers Funnel ==================== -->
 <section id="funnel">
-<h2>My Solution &mdash; 4 Layers of Protection</h2>
+<h2>解決方案 — 4 層防護機制</h2>
 
 <div style="background:linear-gradient(135deg, #064e3b50, #052e1630); border:1px solid #10b98155; padding:20px 24px; border-radius:10px; margin-bottom:18px;">
   <div style="font-size:1.15rem; color:#10b981; font-weight:700; letter-spacing:0.3px; margin-bottom:8px;">
@@ -441,12 +437,12 @@
 </div>
 
 <div class="mechanisms-hero">
-  <div class="mechanisms-subtitle">My design funnels every request through 4 layers, top-to-bottom. Each layer blocks unnecessary API calls.</div>
+  <div class="mechanisms-subtitle">每個請求由上至下通過 4 層防護，每一層都攔截不必要的 API 呼叫。</div>
 
   <div class="funnel">
     <div class="funnel-entry">
       <span class="big">10,000+ requests/day</span>
-      incoming client traffic
+      進入的客戶端請求
     </div>
     <div class="funnel-arrow">&#9660;</div>
 
@@ -458,8 +454,8 @@
           <div class="funnel-layer-code">RateCache</div>
         </div>
         <div class="funnel-layer-right">
-          Same rate requested again within 5 min? Return from cache instantly.
-          <br><span class="funnel-layer-effect">most requests stop here</span>
+          同一個房價在 5 分鐘內再次被查詢？直接從 cache 回傳。
+          <br><span class="funnel-layer-effect">大多數請求在此結束</span>
         </div>
       </div>
     </div>
@@ -473,8 +469,8 @@
           <div class="funnel-layer-code">LockAndFetchRate</div>
         </div>
         <div class="funnel-layer-right">
-          100 requests miss cache at the same time? Only 1 leader proceeds, 99 wait.
-          <br><span class="funnel-layer-effect">N concurrent misses &rarr; 1 API call</span>
+          100 個請求同時 cache miss？只有 1 個成為 leader，其餘 99 個等待。
+          <br><span class="funnel-layer-effect">N 個並發 miss → 只打 1 次 API</span>
         </div>
       </div>
     </div>
@@ -488,8 +484,8 @@
           <div class="funnel-layer-code">QuotaGuard</div>
         </div>
         <div class="funnel-layer-right">
-          Atomic counter — if today's calls already hit 1,000, reject with 429 + Retry-After.
-          <br><span class="funnel-layer-effect">hard ceiling, no race condition</span>
+          原子計數器 — 今天的呼叫次數已達 1,000？直接回傳 429 + Retry-After。
+          <br><span class="funnel-layer-effect">硬性上限，無競態條件</span>
         </div>
       </div>
     </div>
@@ -503,84 +499,58 @@
           <div class="funnel-layer-code">RateApiClient.get_all_rates</div>
         </div>
         <div class="funnel-layer-right">
-          Fetch all 36 rate combinations in 1 API call &rarr; fill entire cache at once.
-          <br><span class="funnel-layer-effect">1 quota unit = 36 cached rates</span>
+          1 次 API 呼叫取得全部 36 種房價組合 → 一次填滿整個 cache。
+          <br><span class="funnel-layer-effect">1 個配額單位 = 36 個 cache 項目</span>
         </div>
       </div>
     </div>
     <div class="funnel-arrow">&#9660;</div>
 
     <div class="funnel-entry">
-      <span class="big" style="color: #10b981;">0 ~ 288 API calls/day</span>
-      theoretical minimum achieved
+      <span class="big" style="color: #10b981;">0 ~ 288 次 API 呼叫/天</span>
+      達到理論最小值
     </div>
   </div>
   <div class="mechanisms-result">
-    <span class="result-label">Quota efficiency:</span>
+    <span class="result-label">配額效率：</span>
     <span class="result-number">0 ~ 288</span>
     <span class="result-unit">calls/day</span>
-    <span class="result-context">(theoretical minimum under 5-min TTL = 288 &nbsp;|&nbsp; budget = 1,000)</span>
+    <span class="result-context">（5 分鐘 TTL 下的理論最小值 = 288 | 預算 = 1,000）</span>
   </div>
 </div>
 </section>
 
 <!-- ==================== Architecture ==================== -->
 <section id="architecture">
-<h2>Architecture</h2>
+<h2>系統架構</h2>
 
-<p style="color:#94a3b8; margin-bottom:18px;">The full picture: client → Rails app (4 layers) → Redis + upstream. Each layer is detailed in its own section below.</p>
+<p style="color:#94a3b8; margin-bottom:18px;">完整架構：client → Rails app（4 層）→ Redis + upstream。每一層在下方各自的區塊中詳細說明。</p>
 
 <img src="architecture.jpg" alt="System architecture diagram" style="width:100%; max-width:100%; height:auto; border-radius:10px; border:1px solid #334155; margin-bottom:20px;">
 
 <div class="card blue" style="margin-top:18px;">
-  <h4>Deployment note &mdash; <span style="color:#f59e0b;">single Redis instance</span> assumption</h4>
+  <h4>部署說明 — <span style="color:#f59e0b;">單一 Redis 實例</span>假設</h4>
   <p>The implementation assumes a <b style="color:#f59e0b;">single Redis instance</b>. Under Sentinel / Cluster HA, the <code>LockAndFetchRate</code> SETNX can be lost during primary failover &mdash; a brief window where two leaders may exist.</p>
   <p style="margin-top:8px;">For production HA, the standard answer is a consensus-backed coordinator like <b>etcd</b>, <b>Consul</b>, or <b>ZooKeeper</b> (Raft/Paxos under the hood). <b>Redlock</b> improves on a single Redis but has known safety issues under clock skew or GC pauses, as discussed in <a href="https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html" target="_blank" style="color:#38bdf8;">Martin Kleppmann's distributed-locking analysis</a>. The atomic <code>QuotaGuard</code> counter is a second line of defence &mdash; even if two leaders briefly co-exist, the daily upstream cap still holds.</p>
 </div>
 </section>
 
-<!-- ==================== Quick Start ==================== -->
-<section id="quickstart">
-<h2>Quick Start</h2>
-
-<div class="cmd">
-<span class="comment"># 1. Build &amp; run the whole stack (app + rate-api + redis)</span>
-<div class="cmd-line"><span class="prompt">$ </span><code>docker compose up -d --build</code><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div>
-<br><span class="comment"># 2. Sanity check</span>
-<div class="cmd-line"><span class="prompt">$ </span><code>curl 'http://localhost:3000/api/v1/pricing?period=Summer&amp;hotel=FloatingPointResort&amp;room=SingletonRoom'</code><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div>
-<br><span class="comment"># 3. Run unit tests</span>
-<div class="cmd-line"><span class="prompt">$ </span><code>docker compose exec app ./bin/rails test</code><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div>
-<br><span class="comment"># 4. Run a single test file</span>
-<div class="cmd-line"><span class="prompt">$ </span><code>docker compose exec app ./bin/rails test test/services/rate_cache_test.rb</code><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div>
-<br><span class="comment"># 5. Run load &amp; chaos tests against the live stack (~1 min smoke / ~6 min full)</span>
-<div class="cmd-line"><span class="prompt">$ </span><code>brew install wrk &amp;&amp; cd load_test &amp;&amp; chmod +x *.sh &amp;&amp; DURATION=30s ./run_all.sh</code><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div>
-<br><span class="comment"># 6. Characterise upstream API behaviour (sends up to 1,100 calls — burns daily quota!)</span>
-<div class="cmd-line"><span class="prompt">$ </span><code>docker compose exec app ruby upstream_test.rb bulk</code><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div>
-</div>
-<p style="font-size:0.85rem; color:#64748b; margin-top:8px;">
-  <b>Step 5</b> validates four behavioural invariants against the running stack — see <a href="#verified">Load &amp; Chaos Tests</a>. Full reference in <code>load_test/README.md</code>.
-  <br>
-  <b>Step 6</b> is how the upstream findings on this page were generated — see <a href="upstream_behavior.html">API Findings</a>.
-</p>
-
-</section>
-
-<!-- ==================== Layer 1: RateCache ==================== -->
+: RateCache ==================== -->
 <section id="cache">
-<h2>Layer 1: Cache</h2>
+<h2>第一層：Cache</h2>
 <p style="color: #64748b; font-size: 0.88rem; margin-top: -8px;"><code>app/services/rate_cache.rb</code></p>
 
 <div class="card green">
-  <h4>Background</h4>
-  <p>The upstream API is expensive (1,000 calls/day). The same <code>(period, hotel, room)</code> returns the same rate for a while.</p>
+  <h4>背景</h4>
+  <p>Upstream API 成本昂貴（每天 1,000 次上限）。相同的 <code>(period, hotel, room)</code> 組合在一段時間內會回傳相同的房價。</p>
 </div>
 <div class="card red">
-  <h4>Problem</h4>
-  <p>Without caching, every request triggers an upstream call. At 10,000 requests/day we'd blow through the quota very fast.</p>
+  <h4>問題</h4>
+  <p>沒有 cache，每個請求都要打 upstream。每天 10,000 筆請求，配額會很快燒光。</p>
 </div>
 <div class="card blue">
-  <h4>Solution</h4>
-  <p>Cache each rate by <code>(period, hotel, room)</code> with a <span class="highlight">5-minute TTL</span>. Within that window, all requests for the same combo are served from cache &mdash; zero upstream calls.</p>
+  <h4>解決方案</h4>
+  <p>以 <code>(period, hotel, room)</code> 為 key，設定 <span class="highlight">5 分鐘 TTL</span> 存入 cache。在此時間窗口內，相同組合的請求全部從 cache 回傳 — 不打任何 upstream。</p>
   <pre>cache key: <span class="string">"pricing:Summer:FloatingPointResort:SingletonRoom"</span>
 TTL: <span class="number">5 minutes</span>
 Total keys: <span class="number">36</span> (4 periods &times; 3 hotels &times; 3 rooms)</pre>
@@ -589,25 +559,25 @@ Total keys: <span class="number">36</span> (4 periods &times; 3 hotels &times; 3
 
 <!-- ==================== Layer 2: LockAndFetchRate ==================== -->
 <section id="lock">
-<h2>Layer 2: Thundering Herd Protection</h2>
+<h2>第二層：Thundering Herd 防護</h2>
 <p style="color: #64748b; font-size: 0.88rem; margin-top: -8px;"><code>app/services/lock_and_fetch_rate.rb</code></p>
 
 <div class="card green">
-  <h4>Background</h4>
-  <p>Cache entries expire every 5 minutes. At the moment of expiry, many requests can arrive at the same time and all see a cache miss.</p>
+  <h4>背景</h4>
+  <p>Cache 每 5 分鐘過期一次。過期瞬間，可能有大量請求同時進來，全部遇到 cache miss。</p>
 </div>
 <div class="card red">
-  <h4>Problem</h4>
-  <p>Without coordination, every concurrent cache-miss request calls upstream independently. A burst of 50 requests burns 50 quota units instead of 1.</p>
+  <h4>問題</h4>
+  <p>沒有協調機制，每個 concurrent cache miss 請求都會各自打 upstream。50 個並發請求會消耗 50 個配額單位，而不是 1 個。</p>
 </div>
 <div class="card blue">
-  <h4>Solution</h4>
-  <p>Use a Redis lock (<code>SET NX</code>) with a <b>global</b> lock key (<code>lock_and_fetch_rate:pricing:bulk_fetch</code>) to elect one &ldquo;leader&rdquo;. The leader calls upstream and fills all 36 cache entries. All &ldquo;followers&rdquo; wait and read from the freshly populated cache.</p>
+  <h4>解決方案</h4>
+  <p>使用 Redis lock（<code>SET NX</code>）搭配<b>全域</b> lock key（<code>lock_and_fetch_rate:pricing:bulk_fetch</code>）選出一個「leader」。Leader 打 upstream 並填滿全部 36 個 cache 項目；其餘「followers」等待並從剛更新的 cache 讀取。</p>
   <div class="math">50 simultaneous requests = 1 upstream call = 1 quota unit = 36 cached rates</div>
 </div>
 
-<h3 id="timing-chain">Timing Chain Design</h3>
-<p>Three values form a chain — each depends on the previous:</p>
+<h3 id="timing-chain">計時鏈設計</h3>
+<p>三個值形成一條計時鏈 — 每個值都依賴前一個：</p>
 
 <div class="timing">
   <div class="timing-box t1">5s<span class="label">UPSTREAM_TIMEOUT</span></div>
@@ -618,34 +588,34 @@ Total keys: <span class="number">36</span> (4 periods &times; 3 hotels &times; 3
 </div>
 
 <div class="card blue">
-  <h4>UPSTREAM_TIMEOUT (5s) — defined in RateApiClient</h4>
-  <p>Without a timeout, if upstream hangs, the request blocks forever and ties up a Puma worker. 5s gives upstream enough time to respond normally, but frees the worker quickly when upstream is down.</p>
+  <h4>UPSTREAM_TIMEOUT（5s）— 定義於 RateApiClient</h4>
+  <p>沒有 timeout，upstream 如果卡住，請求會永遠阻塞並佔用 Puma worker。5 秒讓 upstream 有足夠時間正常回應，但在 upstream 掛掉時能快速釋放 worker。</p>
 </div>
 <div class="card yellow">
-  <h4>FOLLOWER_TIMEOUT (6s) — why not exactly 5s?</h4>
-  <p>The leader could get the upstream response at 4.9s, write cache, but the follower already gave up at 5.0s — wasted the whole wait. The 1s buffer covers this edge case.</p>
+  <h4>FOLLOWER_TIMEOUT（6s）— 為什麼不是剛好 5s？</h4>
+  <p>Leader 可能在 4.9s 收到 upstream 回應並寫入 cache，但 follower 在 5.0s 就放棄了 — 白等一場。多 1 秒的緩衝處理這個邊界情況。</p>
 </div>
 <div class="card purple">
-  <h4>LOCK_AUTO_EXPIRE (7s) — safety net</h4>
-  <p>Normally <code>ensure</code> deletes the lock right away after the leader finishes. But if the process crashes hard (e.g. <code>kill -9</code>), <code>ensure</code> never runs and the lock is stuck. 7s auto-expire is the safety net.</p>
-  <p>It must be longer than FOLLOWER_TIMEOUT (6s). If shorter, the lock expires while followers are still waiting &rarr; a new request grabs the lock &rarr; becomes a second leader &rarr; calls upstream again &rarr; wastes quota.</p>
+  <h4>LOCK_AUTO_EXPIRE（7s）— 安全網</h4>
+  <p>正常情況下，<code>ensure</code> 會在 leader 完成後立即刪除 lock。但若程序強制崩潰（如 <code>kill -9</code>），<code>ensure</code> 不會執行，lock 就卡住了。7 秒自動過期是最後的安全網。</p>
+  <p>必須比 FOLLOWER_TIMEOUT（6s）更長。若更短，lock 在 followers 還在等待時就過期 → 新請求搶到 lock → 成為第二個 leader → 再次打 upstream → 浪費配額。</p>
 </div>
 <div class="card green">
-  <h4>FOLLOWER_POLL_INTERVAL (50ms)</h4>
-  <p>1ms = too fast, floods Redis. 1s = too slow, follower waits up to 1s after leader finishes. 50ms = good balance. At most 50ms extra latency.</p>
+  <h4>FOLLOWER_POLL_INTERVAL（50ms）</h4>
+  <p>1ms 太快，會大量打 Redis。1s 太慢，leader 完成後 follower 最多還要等 1 秒。50ms 是好的平衡點，最多增加 50ms 的額外延遲。</p>
 </div>
 
-<div style="text-align:center;"><a href="lock_and_fetch_rate_demo.html" class="demo-link">Open Interactive Demo &rarr;</a></div>
+<div style="text-align:center;"><a href="lock_and_fetch_rate_demo.html" class="demo-link">開啟互動式 Demo &rarr;</a></div>
 </section>
 
 <!-- ==================== Layer 3: QuotaGuard ==================== -->
 <section id="quota">
-<h2>Layer 3: Quota Guard</h2>
+<h2>第三層：Quota Guard</h2>
 <p style="color: #64748b; font-size: 0.88rem; margin-top: -8px;"><code>app/services/quota_guard.rb</code></p>
 
 <div class="card green">
-  <h4>Background &mdash; a fast-fail tripwire</h4>
-  <p>With Batch Fetch, the theoretical maximum is only 288 calls/day &mdash; well under the 1,000 budget. Under normal operation, QuotaGuard will <b>never trigger</b>. It exists as a <b>local tripwire</b> for scenarios that shouldn't happen but could &mdash; bugs that turn every cache miss into an upstream call:</p>
+  <h4>背景 — 快速失敗的保險絲</h4>
+  <p>搭配 Batch Fetch，理論最大值只有 288 次/天 — 遠低於 1,000 的預算。正常運作下，QuotaGuard <b>永遠不會觸發</b>。它是一個<b>本地保險絲</b>，用來防範不該發生但可能發生的情況 — 例如讓每次 cache miss 都變成 upstream 呼叫的 bug：</p>
   <ul style="margin: 8px 0 12px 20px; font-size: 0.95rem; line-height: 1.8;">
     <li><b>Upstream changes response format</b> &mdash; e.g. upstream renames <code>rate</code> to <code>price</code>. Parser fails, cache stays empty, every request hits upstream until upstream itself starts rejecting.</li>
     <li><b>Bug in cache write</b> &mdash; e.g. <code>RateCache.write_all</code> has a typo in the key name. Writes succeed silently but reads never match &rarr; same runaway loop.</li>
@@ -660,108 +630,108 @@ Total keys: <span class="number">36</span> (4 periods &times; 3 hotels &times; 3
   </div>
 </div>
 <div class="card red">
-  <h4>Problem</h4>
-  <p>Multiple Puma workers handle requests in parallel. A naive &ldquo;read &rarr; check &rarr; increment&rdquo; has a race condition: two workers could both read 999, both pass the check, and both call upstream.</p>
+  <h4>問題</h4>
+  <p>多個 Puma worker 同時處理請求。簡單的「讀取 → 檢查 → 遞增」存在競態條件：兩個 worker 可能同時讀到 999，同時通過檢查，然後各自打 upstream。</p>
   <pre><span class="comment">// Race condition example:</span>
 Worker A: read count &rarr; <span class="number">999</span> &rarr; passes check &rarr; calls upstream   <span class="comment">// count is now 1000</span>
 Worker B: read count &rarr; <span class="number">999</span> &rarr; passes check &rarr; calls upstream   <span class="comment">// EXCEEDED!</span></pre>
 </div>
 <div class="card blue">
-  <h4>Solution</h4>
-  <p>Redis <code>INCR</code> is atomic &mdash; it increments and returns the new value in one step. Each request gets a unique sequential number. Exactly 1,000 calls pass through. No race condition.</p>
+  <h4>解決方案</h4>
+  <p>Redis <code>INCR</code> 是原子操作 — 在單一步驟內遞增並回傳新值。每個請求取得唯一的序號，恰好 1,000 次呼叫通過，沒有競態條件。</p>
   <pre>daily key: <span class="string">"quota:2026-04-22"</span>    <span class="comment">// auto-expires at midnight</span>
 Redis INCR &rarr; <span class="number">1000</span> &rarr; pass &#10003;
 Redis INCR &rarr; <span class="number">1001</span> &rarr; raise ExhaustedError &#10007;</pre>
 </div>
 
 <div class="card yellow">
-  <h4>Why 1,000 and not 900?</h4>
-  <p>Because INCR is atomic, there's no way to overshoot. A lower buffer only makes sense with a gradual slowdown strategy. We use a hard stop with <code>Retry-After</code> until midnight, so capping lower just wastes quota.</p>
+  <h4>為什麼是 1,000 而不是 900？</h4>
+  <p>INCR 是原子操作，不可能超出。降低緩衝只在有逐漸減速策略時有意義。我們用硬性停止加上 <code>Retry-After</code> 到午夜，所以設更低的上限只是浪費配額。</p>
 </div>
 
 <div class="card red">
-  <h4>Assumption: quota resets at UTC midnight</h4>
-  <p>The upstream the upstream rate API documentation does not specify when the daily quota resets. This implementation assumes <b>UTC midnight</b> &mdash; the Redis key uses <code>quota:YYYY-MM-DD</code> (UTC) and the <code>Retry-After</code> header counts seconds until UTC 00:00. If the actual reset time differs, only the key date logic and Retry-After calculation need to change.</p>
+  <h4>假設：配額在 UTC 午夜重置</h4>
+  <p>Upstream rate API 文件沒有說明每日配額何時重置。本實作假設<b>UTC 午夜</b> — Redis key 使用 <code>quota:YYYY-MM-DD</code>（UTC），<code>Retry-After</code> header 計算到 UTC 00:00 的秒數。若實際重置時間不同，只需修改 key 的日期邏輯與 Retry-After 計算。</p>
 </div>
 </section>
 
 <!-- ==================== Layer 4: Batch Fetch ==================== -->
 <section id="batch">
-<h2>Layer 4: Batch Fetch</h2>
+<h2>第四層：Batch Fetch</h2>
 <p style="color: #64748b; font-size: 0.88rem; margin-top: -8px;"><code>lib/rate_api_client.rb</code> &rarr; <code>get_all_rates</code></p>
 
 <div class="card green">
-  <h4>Background</h4>
-  <p>The upstream API accepts multiple rate queries in a single request. There are 36 possible combinations (4 periods &times; 3 hotels &times; 3 rooms).</p>
+  <h4>背景</h4>
+  <p>Upstream API 支援在單一請求中查詢多個房價。總共有 36 種組合（4 個時段 × 3 家飯店 × 3 種房型）。</p>
 </div>
 <div class="card red">
-  <h4>Problem</h4>
-  <p>Without batching, each cache miss fetches only one rate &mdash; one quota unit per rate. Even with LockAndFetchRate, the worst case is 36 cache misses &times; 288 windows = 10,368 calls/day.</p>
+  <h4>問題</h4>
+  <p>沒有 batch，每次 cache miss 只取一個房價 — 每個房價消耗一個配額單位。即使有 LockAndFetchRate，最糟情況仍是 36 次 cache miss × 288 個窗口 = 10,368 次/天。</p>
 </div>
 <div class="card blue">
-  <h4>Solution</h4>
-  <p>On any cache miss, fetch <b>all 36 rates</b> in a single API call via <code>RateApiClient.get_all_rates</code>. Then <code>RateCache.write_all</code> fills every cache key at once. One quota unit refreshes the entire cache for the next 5 minutes.</p>
+  <h4>解決方案</h4>
+  <p>任何 cache miss 發生時，透過 <code>RateApiClient.get_all_rates</code> 以<b>單一 API 呼叫取得全部 36 個房價</b>，再由 <code>RateCache.write_all</code> 一次填滿所有 cache key。一個配額單位讓整個 cache 在接下來 5 分鐘內保持有效。</p>
   <div class="math">1 API call &rarr; 36 cache entries &rarr; 5 minutes of full coverage</div>
 </div>
 
 <div class="comparison">
   <div class="side before">
-    <h4>Without Batch</h4>
+    <h4>未使用 Batch</h4>
     <pre>Cache miss for <span class="string">"Summer:FloatingPointResort:SingletonRoom"</span>
   &rarr; fetch <span class="number">1</span> rate
   &rarr; write <span class="number">1</span> cache entry
   &rarr; <span class="number">1</span> quota unit for <span class="number">1</span> rate</pre>
-    <p style="font-size:0.95rem;">Worst case: <span style="color:#ef4444; font-weight:600;">10,368 calls/day</span></p>
+    <p style="font-size:0.95rem;">最糟情況：<span style="color:#ef4444; font-weight:600;">10,368 次/天</span></p>
   </div>
   <div class="side after">
-    <h4>With Batch</h4>
+    <h4>使用 Batch</h4>
     <pre>Cache miss for <span class="string">"Summer:FloatingPointResort:SingletonRoom"</span>
   &rarr; fetch <span class="number">36</span> rates (all combos)
   &rarr; write <span class="number">36</span> cache entries
   &rarr; <span class="number">1</span> quota unit for <span class="number">36</span> rates</pre>
-    <p style="font-size:0.95rem;">Worst case: <span style="color:#10b981; font-weight:600;">288 calls/day</span> (= theoretical minimum)</p>
+    <p style="font-size:0.95rem;">最糟情況：<span style="color:#10b981; font-weight:600;">288 次/天</span>（= 理論最小值）</p>
   </div>
 </div>
 </section>
 
 <!-- ==================== Request Flow ==================== -->
 <section id="flow">
-<h2>Request Flow</h2>
+<h2>請求流程</h2>
 
 <div class="flow">
   <div class="flow-step controller">
     <b>PricingController</b>
-    <div class="detail">Validate params &rarr; 400 if invalid; render service errors with proper status (429, 502, 504)</div>
+    <div class="detail">驗證參數 → 無效時回傳 400；將 service 錯誤轉換為對應狀態碼（429、502、504）</div>
   </div>
   <div class="flow-arrow">&#9660;</div>
   <div class="flow-step service">
     <b>PricingService</b>
-    <div class="detail">Orchestrates the full flow, maps errors to HTTP status codes</div>
+    <div class="detail">協調完整流程，將錯誤對應至 HTTP 狀態碼</div>
   </div>
   <div class="flow-arrow">&#9660;</div>
   <div class="flow-step cache">
     <b>&oplus; RateCache.read</b>
-    <div class="detail">Cache hit? &rarr; return immediately, skip everything below</div>
+    <div class="detail">Cache 命中？→ 立即回傳，略過以下所有步驟</div>
   </div>
-  <div class="flow-arrow">&#9660; cache miss</div>
+  <div class="flow-arrow">&#9660; cache miss 時繼續</div>
   <div class="flow-step lock">
     <b>&oplus; LockAndFetchRate.call</b>
-    <div class="detail">Grab Redis lock &rarr; only one request proceeds (leader), others wait (followers)</div>
+    <div class="detail">取得 Redis lock → 只有一個請求繼續（leader），其餘等待（followers）</div>
   </div>
-  <div class="flow-arrow">&#9660; leader only</div>
+  <div class="flow-arrow">&#9660; 僅 leader 繼續</div>
   <div class="flow-step quota">
     <b>&oplus; QuotaGuard.consume_quota!</b>
-    <div class="detail">Atomic Redis INCR &mdash; if count > 1,000, raise ExhaustedError</div>
+    <div class="detail">原子 Redis INCR — 若計數超過 1,000，拋出 ExhaustedError</div>
   </div>
   <div class="flow-arrow">&#9660;</div>
   <div class="flow-step api">
     <b>&oplus; RateApiClient.get_all_rates</b>
-    <div class="detail">POST all 36 combinations in one request &rarr; 1 API call = 1 quota unit</div>
+    <div class="detail">單一請求 POST 全部 36 種組合 → 1 次 API 呼叫 = 1 個配額單位</div>
   </div>
   <div class="flow-arrow">&#9660;</div>
   <div class="flow-step cache">
     <b>&oplus; RateCache.write_all (36 rates)</b>
-    <div class="detail">Fill entire cache in one shot &rarr; all 36 keys get 5-min TTL</div>
+    <div class="detail">一次填滿整個 cache → 全部 36 個 key 取得 5 分鐘 TTL</div>
   </div>
 </div>
 
@@ -769,13 +739,13 @@ Redis INCR &rarr; <span class="number">1001</span> &rarr; raise ExhaustedError &
 
 <!-- ==================== Design Decisions ==================== -->
 <section id="decisions">
-<h2>Design Decisions</h2>
-<p>Each decision lists the options considered, the choice, and the trade-off consciously accepted. Click to expand.</p>
+<h2>設計決策</h2>
+<p>每項決策列出考量的選項、最終選擇，以及有意識地接受的 trade-off。點擊展開。</p>
 
 <div class="decision open" data-id="d1">
   <div class="decision-header" onclick="toggleDecision(this)">
     <div class="decision-num">1</div>
-    <div class="decision-title">When to fetch upstream <span style="color:#64748b; font-size:0.85rem; font-weight:400;">(Lazy vs Prewarming)</span></div>
+    <div class="decision-title">何時打 upstream <span style="color:#64748b; font-size:0.85rem; font-weight:400;">（Lazy vs Prewarming）</span></div>
     <div class="decision-choice">Lazy on-demand</div>
     <div class="decision-arrow">&#9656;</div>
   </div>
@@ -808,7 +778,7 @@ Redis INCR &rarr; <span class="number">1001</span> &rarr; raise ExhaustedError &
 <div class="decision" data-id="d2">
   <div class="decision-header" onclick="toggleDecision(this)">
     <div class="decision-num">2</div>
-    <div class="decision-title">Shared cache backend <span style="color:#64748b; font-size:0.85rem; font-weight:400;">(L1–L3)</span></div>
+    <div class="decision-title">共享 cache backend <span style="color:#64748b; font-size:0.85rem; font-weight:400;">（L1–L3）</span></div>
     <div class="decision-choice">Redis</div>
     <div class="decision-arrow">&#9656;</div>
   </div>
@@ -828,7 +798,7 @@ Redis INCR &rarr; <span class="number">1001</span> &rarr; raise ExhaustedError &
 <div class="decision" data-id="d3">
   <div class="decision-header" onclick="toggleDecision(this)">
     <div class="decision-num">3</div>
-    <div class="decision-title">Thundering herd protection <span style="color:#64748b; font-size:0.85rem; font-weight:400;">(L2 Lock)</span></div>
+    <div class="decision-title">Thundering herd 防護 <span style="color:#64748b; font-size:0.85rem; font-weight:400;">（L2 Lock）</span></div>
     <div class="decision-choice">Redis SET NX lock</div>
     <div class="decision-arrow">&#9656;</div>
   </div>
@@ -851,7 +821,7 @@ token = SecureRandom.uuid                              <span class="comment">// 
 <div class="decision" data-id="d4">
   <div class="decision-header" onclick="toggleDecision(this)">
     <div class="decision-num">4</div>
-    <div class="decision-title">Quota protection <span style="color:#64748b; font-size:0.85rem; font-weight:400;">(L3 Quota)</span></div>
+    <div class="decision-title">配額防護 <span style="color:#64748b; font-size:0.85rem; font-weight:400;">（L3 Quota）</span></div>
     <div class="decision-choice">Redis atomic counter</div>
     <div class="decision-arrow">&#9656;</div>
   </div>
@@ -893,7 +863,7 @@ token = SecureRandom.uuid                              <span class="comment">// 
 <div class="decision" data-id="d5">
   <div class="decision-header" onclick="toggleDecision(this)">
     <div class="decision-num">5</div>
-    <div class="decision-title">Failure strategy</div>
+    <div class="decision-title">故障策略</div>
     <div class="decision-choice">Fail-closed</div>
     <div class="decision-arrow">&#9656;</div>
   </div>
@@ -952,8 +922,8 @@ token = SecureRandom.uuid                              <span class="comment">// 
 <div class="decision" data-id="d6">
   <div class="decision-header" onclick="toggleDecision(this)">
     <div class="decision-num">6</div>
-    <div class="decision-title">Error handling</div>
-    <div class="decision-choice">Distinct HTTP status per failure</div>
+    <div class="decision-title">錯誤處理</div>
+    <div class="decision-choice">每種失敗對應不同 HTTP 狀態碼</div>
     <div class="decision-arrow">&#9656;</div>
   </div>
   <div class="decision-body">
@@ -1038,7 +1008,7 @@ token = SecureRandom.uuid                              <span class="comment">// 
 <div class="decision" data-id="d7">
   <div class="decision-header" onclick="toggleDecision(this)">
     <div class="decision-num">7</div>
-    <div class="decision-title">Observability</div>
+    <div class="decision-title">可觀測性</div>
     <div class="decision-choice">Lograge structured logs</div>
     <div class="decision-arrow">&#9656;</div>
   </div>
@@ -1055,7 +1025,7 @@ token = SecureRandom.uuid                              <span class="comment">// 
 <div class="decision" data-id="d8">
   <div class="decision-header" onclick="toggleDecision(this)">
     <div class="decision-num">8</div>
-    <div class="decision-title">Testing strategy</div>
+    <div class="decision-title">測試策略</div>
     <div class="decision-choice">WebMock</div>
     <div class="decision-arrow">&#9656;</div>
   </div>
@@ -1066,29 +1036,14 @@ token = SecureRandom.uuid                              <span class="comment">// 
 </div>
 </section>
 
-<!-- ==================== Non-Goals ==================== -->
-<section id="nongoals">
-<h2>Non-Goals</h2>
-<p>These were considered and intentionally left out:</p>
-
-<div class="nongoal skip">
-  <div class="nongoal-icon">&#10005;</div>
-  <div class="nongoal-text"><strong>Code-level retry (retry_on)</strong><div class="nongoal-reason">The next user request becomes a new leader and tries again. That's enough — no need to retry inside the same call. See <a href="lock_and_fetch_rate_demo.html#recovery-chain"><b>Recovery Chain (3 leaders)</b> demo</a> for a visual walkthrough.</div></div>
-</div>
-<div class="nongoal skip">
-  <div class="nongoal-icon">&#10005;</div>
-  <div class="nongoal-text"><strong>Background pre-warming of hot keys</strong><div class="nongoal-reason">Without production traffic data, picking which keys to warm is guesswork and wastes quota.</div></div>
-</div>
-</section>
-
-<!-- ==================== Failure Modes ==================== -->
+ ==================== -->
 <section id="failures">
-<h2>Failure Modes</h2>
-<p style="color:#94a3b8; margin-top:-8px; margin-bottom:18px;">What happens when each dependency fails, and why the 1000/day cap still holds.</p>
+<h2>故障情境</h2>
+<p style="color:#94a3b8; margin-top:-8px; margin-bottom:18px;">每個依賴項目失敗時會發生什麼，以及為什麼每日 1,000 次上限仍然成立。</p>
 
 <table>
   <thead>
-    <tr><th>What fails</th><th>What happens inside</th><th>Client sees</th><th>Upstream impact</th><th>Recovery</th></tr>
+    <tr><th>什麼失敗了</th><th>內部發生什麼</th><th>客戶端看到</th><th>對 Upstream 的影響</th><th>恢復方式</th></tr>
   </thead>
   <tbody>
     <tr>
@@ -1165,229 +1120,101 @@ token = SecureRandom.uuid                              <span class="comment">// 
 </table>
 
 <div class="card blue" style="margin-top:18px;">
-  <h4>Design principle</h4>
-  <p>Every dependency failure routes to a 5xx response. The service <b>never</b> calls upstream when its protection layers (cache / lock / quota) are degraded. This is "fail-closed" — protect the upstream contract at the cost of own uptime, which is the right priority for a proxy.</p>
+  <h4>設計原則</h4>
+  <p>每個依賴失敗都導向 5xx 回應。當保護層（cache / lock / quota）降級時，服務<b>絕不</b>打 upstream。這就是「fail-closed」— 以自身可用性換取保護 upstream 合約，對 proxy 來說這是正確的優先順序。</p>
 </div>
 
 </section>
 
 <!-- ==================== Upstream API ==================== -->
 <section id="upstream">
-<h2>Upstream API Findings</h2>
-<p>Two live test runs — 1001 calls each — against the upstream rate API, run before implementation. <span style="color:#ef4444;font-weight:600;">~28% failure rate</span> across 4 distinct failure modes, all confirmed in both single and bulk requests.</p>
+<h2>Upstream API 觀察</h2>
+<p>實作前對 upstream rate API 進行兩次真實測試 — 各 1,001 次呼叫。<span style="color:#ef4444;font-weight:600;">~28% 失敗率</span>，涵蓋 4 種不同的失敗模式，在單次與批次請求中均已確認。</p>
 
 <div class="finding danger">
-  <div class="finding-title" style="font-size:1.08rem;font-weight:700;color:#f1f5f9;">HTTP 200 does not mean success</div>
+  <div class="finding-title" style="font-size:1.08rem;font-weight:700;color:#f1f5f9;">HTTP 200 不代表成功</div>
   <div class="finding-row"><span class="finding-label">Finding</span><span class="finding-value">Upstream returns <span class="status-badge s-200">200</span> for three distinct failure modes: error body with no <code>rates</code> key (~7%), <code>rate</code> field silently absent from response (~7%), and empty <code>rates</code> array. HTTP status alone cannot be trusted.</span></div>
   <div class="finding-row"><span class="finding-label">Decision</span><span class="finding-value"><code>RateApiClient</code> inspects the response body on every 200 — each failure mode raises <code>UpstreamError</code>, never returns nil silently.</span></div>
 </div>
 
 <div class="finding warn">
-  <div class="finding-title" style="font-size:1.08rem;font-weight:700;color:#f1f5f9;">Missing <code>rate</code> field is not quota exhaustion</div>
+  <div class="finding-title" style="font-size:1.08rem;font-weight:700;color:#f1f5f9;">缺少 <code>rate</code> 欄位不等於配額耗盡</div>
   <div class="finding-row"><span class="finding-label">Finding</span><span class="finding-value">Initial design assumed a missing <code>rate</code> field meant quota was exhausted. Testing proved otherwise — the missing field is an intermittent processing error (~7% regardless of quota). Quota exhaustion has its own signal: <span class="status-badge s-429">429</span> with <code>{"error":"Rate limit exceeded (1000/day)"}</code>.</span></div>
   <div class="finding-row"><span class="finding-label">Decision</span><span class="finding-value">Map HTTP 429 → <code>QuotaExhaustedError</code>. Map missing rate → <code>UpstreamError</code>. Two separate exceptions, two separate response paths.</span></div>
 </div>
 
 <div class="finding warn">
-  <div class="finding-title" style="font-size:1.08rem;font-weight:700;color:#f1f5f9;">401 does not consume upstream quota — refund on auth failure</div>
+  <div class="finding-title" style="font-size:1.08rem;font-weight:700;color:#f1f5f9;">401 不消耗 upstream 配額 — 驗證失敗時退還配額</div>
   <div class="finding-row"><span class="finding-label">Finding</span><span class="finding-value">Empirically verified: 1000 invalid-token calls followed by a valid call returned 200, not 429. Upstream rejects 401s before any processing occurs.</span></div>
   <div class="finding-row"><span class="finding-label">Decision</span><span class="finding-value"><code>QuotaGuard</code> pre-consumes one unit before every upstream call. On 401, it refunds the unit — the request never reached upstream processing.</span></div>
 </div>
 
 <div style="margin-top:20px;text-align:center;">
-  <a href="upstream_behavior.html" class="report-link">Full test data &amp; error mapping &rarr;</a>
+  <a href="upstream_behavior.html" class="report-link">完整測試資料與錯誤對應 &rarr;</a>
 </div>
 </section>
 
 <!-- ==================== Load & Chaos Tests ==================== -->
 <section id="verified">
-<h2>Load &amp; Chaos Tests</h2>
+<h2>壓力與混沌測試</h2>
 
-<p style="color:#94a3b8; margin-bottom:16px;">Unit tests prove the code is correct. <b>Load tests prove it works under real traffic.</b> I ran 4 tests against the live app (Rails + Redis + rate-api) — here's what each one asks and what I measured.</p>
+<p style="color:#94a3b8; margin-bottom:16px;">Unit test 驗證程式碼正確性，<b>壓力測試驗證真實流量下的行為。</b>我對真實運行的應用程式（Rails + Redis + rate-api）執行了 4 項測試 — 以下是每項測試的問題與量測結果。</p>
 
 <table>
   <thead>
-    <tr><th>What I'm testing</th><th>The question</th><th>What I measured</th><th></th></tr>
+    <tr><th>測試項目</th><th>驗證問題</th><th>量測結果</th><th></th></tr>
   </thead>
   <tbody>
     <tr>
       <td><b>Single-flight lock</b></td>
-      <td>If 50 users hit the API at the same time on a cold cache, do they all hammer the upstream — or does my lock collapse them into one call?</td>
+      <td>50 個使用者同時在 cold cache 狀態下打 API，是全部各自打 upstream，還是 lock 將它們合併成 1 次呼叫？</td>
       <td><b>1,404 client requests → 1 upstream call</b><br><span style="color:#64748b; font-size:0.88rem;">5 seconds at 50 concurrent connections</span></td>
       <td><span style="color:#10b981; font-weight:700;">✓ PASS</span></td>
     </tr>
     <tr>
-      <td><b>Cache hit rate</b></td>
-      <td>Under steady traffic, what percent of requests are served from cache vs. hitting the upstream?</td>
+      <td><b>Cache 命中率</b></td>
+      <td>在穩定流量下，有多少比例的請求從 cache 回傳，有多少打到 upstream？</td>
       <td><b>99.93% hit rate</b><br><span style="color:#64748b; font-size:0.88rem;">7,081 hits / 5 misses in 30 seconds</span></td>
       <td><span style="color:#10b981; font-weight:700;">✓ PASS</span></td>
     </tr>
     <tr>
-      <td><b>Quota hard cap</b></td>
-      <td>If something goes wrong and we approach the 1,000/day upstream limit, does the 1,001st call get blocked — or does it leak through?</td>
+      <td><b>配額硬性上限</b></td>
+      <td>若出錯而接近每日 1,000 次上限，第 1,001 次呼叫會被阻擋，還是會漏過去？</td>
       <td><b>HTTP 429 returned, 0 upstream calls</b><br><span style="color:#64748b; font-size:0.88rem;">Set counter to 1000, next request blocked with <code>Retry-After: 31254s</code> (until UTC midnight)</span></td>
       <td><span style="color:#10b981; font-weight:700;">✓ PASS</span></td>
     </tr>
     <tr>
-      <td><b>Fail-closed when Redis dies</b></td>
-      <td>If Redis crashes, does the service keep accidentally calling upstream — or does it shut the door cleanly?</td>
+      <td><b>Redis 崩潰時 fail-closed</b></td>
+      <td>Redis 崩潰時，服務是繼續意外打 upstream，還是乾淨地關閉入口？</td>
       <td><b>5/5 requests blocked, 0 upstream calls</b><br><span style="color:#64748b; font-size:0.88rem;">All returned HTTP 504; service auto-recovered when Redis came back</span></td>
       <td><span style="color:#10b981; font-weight:700;">✓ PASS</span></td>
     </tr>
   </tbody>
 </table>
 
-<p style="margin-top:14px; font-size:0.92rem; color:#64748b;"><b>Try it yourself:</b> <code>cd load_test &amp;&amp; ./run_all.sh</code> (~6 minutes total) or <code>DURATION=30s ./run_all.sh</code> (~1 minute smoke test).</p>
+<p style="margin-top:14px; font-size:0.92rem; color:#64748b;"><b>自行驗證：</b><code>cd load_test &amp;&amp; ./run_all.sh</code>（約 6 分鐘）或 <code>DURATION=30s ./run_all.sh</code>（約 1 分鐘快速驗證）。</p>
 </section>
 
-<!-- ==================== File Inventory ==================== -->
-<section id="files">
-<h2>File Inventory</h2>
-<p style="color:#94a3b8; margin-top:-8px; margin-bottom:18px;">Rails project tree with annotations. <b style="color:#10b981;">NEW</b> = I wrote it. <b style="color:#f59e0b;">MOD</b> = starter file I edited. <b style="color:#64748b;">UNTOUCHED</b> = Rails defaults left as-is.</p>
-
-<pre class="tree" style="font-size:0.82rem; line-height:1.7;">
-inference-cache-gateway/
-├── app/
-│   ├── controllers/
-│   │   ├── api/v1/pricing_controller.rb      <span style="color:#f59e0b;">[MOD]</span>  extracted whitelists, broadened error rendering
-│   │   └── application_controller.rb         <span style="color:#64748b;">[UNTOUCHED]</span>
-│   ├── models/
-│   │   ├── pricing_constants.rb              <span style="color:#10b981;">[NEW]</span>  whitelist (period/hotel/room) — moved out of controller
-│   │   └── application_record.rb             <span style="color:#64748b;">[UNTOUCHED]</span>
-│   ├── services/
-│   │   ├── api/v1/pricing_service.rb         <span style="color:#f59e0b;">[MOD]</span>  rewrote stub into 4-layer orchestrator + error mapping
-│   │   ├── base_service.rb                   <span style="color:#64748b;">[UNTOUCHED]</span>  result / errors pattern (kept the starter)
-│   │   ├── rate_cache.rb                     <span style="color:#10b981;">[NEW]</span>  <b>L1</b> 5-min TTL cache
-│   │   ├── lock_and_fetch_rate.rb            <span style="color:#10b981;">[NEW]</span>  <b>L2</b> SETNX leader election + fencing token
-│   │   └── quota_guard.rb                    <span style="color:#10b981;">[NEW]</span>  <b>L3</b> atomic 1000/day cap + refund-on-401
-│   ├── jobs/application_job.rb               <span style="color:#64748b;">[UNTOUCHED]</span>
-│   └── channels/                             <span style="color:#64748b;">[UNTOUCHED]</span>
-├── lib/
-│   └── rate_api_client.rb                    <span style="color:#f59e0b;">[MOD]</span>  <b>L4</b> ACL — added typed exceptions, dry-schema, bulk fetch
-├── config/
-│   ├── routes.rb                             <span style="color:#64748b;">[UNTOUCHED]</span>  the starter already scoped /api/v1/pricing
-│   ├── initializers/
-│   │   ├── lograge.rb                        <span style="color:#10b981;">[NEW]</span>  structured JSON logs (cache_status, upstream_latency_ms)
-│   │   ├── cors.rb                           <span style="color:#64748b;">[UNTOUCHED]</span>
-│   │   ├── filter_parameter_logging.rb       <span style="color:#64748b;">[UNTOUCHED]</span>
-│   │   └── inflections.rb                    <span style="color:#64748b;">[UNTOUCHED]</span>
-│   ├── environments/{development,production,test}.rb  <span style="color:#f59e0b;">[MOD]</span>  cache_store + lograge wiring
-│   └── application.rb / boot.rb / environment.rb / puma.rb / cable.yml / database.yml / locales/  <span style="color:#64748b;">[UNTOUCHED]</span>
-├── test/
-│   ├── services/pricing_service_test.rb      <span style="color:#10b981;">[NEW]</span>
-│   ├── services/rate_cache_test.rb           <span style="color:#10b981;">[NEW]</span>
-│   ├── services/lock_and_fetch_rate_test.rb  <span style="color:#10b981;">[NEW]</span>
-│   ├── services/quota_guard_test.rb          <span style="color:#10b981;">[NEW]</span>
-│   ├── lib/rate_api_client_test.rb           <span style="color:#10b981;">[NEW]</span>
-│   ├── controllers/pricing_controller_test.rb<span style="color:#f59e0b;">[MOD]</span>  expanded to cover new error paths
-│   └── test_helper.rb                        <span style="color:#f59e0b;">[MOD]</span>  + WebMock, SimpleCov, Timecop
-├── load_test/                                <span style="color:#10b981;">[NEW]</span>  <b>chaos test suite</b>
-│   ├── 1_singleflight.sh                     50 concurrent cold-start → 1 upstream call
-│   ├── 2_cache_hit_rate.sh                   sustained load → ≥99% hit rate
-│   ├── 3_quota_cap.sh                        counter at 1000 → 1001st blocked, 0 leak
-│   ├── 4_fail_closed.sh                      Redis stopped → all 5xx, 0 upstream
-│   ├── lib.sh / run_all.sh                   shared helpers + orchestrator
-│   └── README.md
-├── bin/                                      <span style="color:#64748b;">[UNTOUCHED]</span>  bundle / rails / rake / setup / docker-entrypoint
-├── db/seeds.rb                               <span style="color:#64748b;">[UNTOUCHED]</span>
-├── public/robots.txt                         <span style="color:#64748b;">[UNTOUCHED]</span>
-├── Gemfile / Gemfile.lock                    <span style="color:#f59e0b;">[MOD]</span>  + redis, lograge, dry-schema, simplecov, timecop, webmock, rubocop
-├── docker-compose.yml                        <span style="color:#f59e0b;">[MOD]</span>  + Redis container, AOF persistence, env wiring
-├── Dockerfile                                <span style="color:#64748b;">[UNTOUCHED]</span>
-├── .gitignore                                <span style="color:#f59e0b;">[MOD]</span>  + log/.env/coverage entries
-├── .env.example                              <span style="color:#10b981;">[NEW]</span>  RATE_API_URL / RATE_API_TOKEN
-├── .rubocop.yml                              <span style="color:#10b981;">[NEW]</span>  style rules
-├── upstream_test.rb                          <span style="color:#10b981;">[NEW]</span>  small Ruby script that hits upstream a bunch of times to see how it really behaves
-├── UPSTREAM_BEHAVIOR.md                      <span style="color:#10b981;">[NEW]</span>  documented response patterns from 1001 live calls
-├── README.md                                 <span style="color:#f59e0b;">[MOD]</span>  rewrote to point at this design site
-└── Netify_site/                              <span style="color:#10b981;">[NEW]</span>  this design site (3 HTML pages + diagram)
-</pre>
-
-<div class="card blue" style="margin-top:18px;">
-  <h4>Why this matters</h4>
-  <p>Boilerplate (<code>bin/</code>, most <code>config/</code>, <code>db/</code>, channels, jobs) is left as Rails defaults — there's no value in reformatting code I didn't change. Reviewer can focus on the <b style="color:#10b981;">NEW</b> and <b style="color:#f59e0b;">MOD</b> entries.</p>
-</div>
-</section>
-
-<!-- ==================== AI Usage ==================== -->
-<section id="ai-usage">
-<h2>Agent-First Workflow</h2>
-
-<blockquote style="margin:0 0 20px;padding:12px 16px;background:#1e293b;border-left:3px solid #334155;border-radius:0 6px 6px 0;">
-  <p style="margin:0 0 4px;font-size:0.92rem;color:#94a3b8;font-style:italic;">"Accelerate your agents with convention over configuration."</p>
-  <p style="margin:0;font-size:0.82rem;color:#475569;font-style:italic;"><a href="https://rubyonrails.org" target="_blank" style="color:#475569;text-decoration:none;">Ruby on Rails scales from <span style="color:#94a3b8;">PROMPT</span> to IPO. Token-efficient code that's easy for agents to write and beautiful for humans to review.</a> — <a href="https://rubyonrails.org" target="_blank" style="color:#64748b;">rubyonrails.org</a></p>
-</blockquote>
-
-<p style="color:#64748b;margin-bottom:16px;"><b>Tool:</b> <span style="color: #38bdf8;">Claude Code (CLI)</span> — Anthropic's official CLI for Claude &nbsp;·&nbsp; <span style="color: #38bdf8;">Claude Opus 4.7</span></p>
-
-<p style="margin-bottom: 6px; font-size: 1.05rem;"><span style="color: #f1f5f9; font-weight: 700;">I direct &amp; define</span> &rarr; <span style="color: #64748b;">agent executes</span> &rarr; <span style="color: #f1f5f9; font-weight: 700;">I review, challenge, and decide.</span></p>
-<p style="margin-bottom: 20px; font-size: 1.05rem; color: #94a3b8;">I am the <span style="color: #38bdf8; font-weight: 600;">starting point (design)</span> and the <span style="color: #38bdf8; font-weight: 600;">finish line (quality)</span> — the agent accelerates everything in between.</p>
-
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
-  <div class="card blue">
-    <h4 style="color: #38bdf8;">My Role — Direct &amp; Decide</h4>
-    <p style="font-size: 0.9rem; color: #cbd5e1; margin: 8px 0 14px; line-height: 1.6;">I set the direction, owned every architectural decision, and defined the constraints at every layer. A few examples of what that looked like in practice:</p>
-    <p style="font-size: 0.85rem; color: #94a3b8; margin: 6px 0 10px;">Direction</p>
-    <ul style="margin: 0 0 12px 16px; font-size: 0.92rem; line-height: 1.8;">
-      <li>Designed the 4-layer architecture and all the rules before any code was written — I designed it; the agent built it</li>
-      <li><b>Scalability</b> — designed batch fetch: one upstream call returns all 36 rates at once instead of 36 separate calls on every cache miss</li>
-      <li><b>Observability</b> — added structured JSON logging on every request with <code>cache_status</code> and <code>upstream_latency_ms</code>, so every cache hit/miss and latency spike shows up in logs</li>
-      <li><b>Risk</b> — moved <code>RATE_API_TOKEN</code> out of docker-compose into <code>.env</code> so secrets are never committed to the repo; switched QuotaGuard from <code>Redis.new</code> to <code>Rails.cache</code> connection pool to prevent connection leaks under load</li>
-    </ul>
-    <p style="font-size: 0.85rem; color: #94a3b8; margin: 6px 0 10px;">Challenge &amp; Correct</p>
-    <ul style="margin: 0 0 12px 16px; font-size: 0.92rem; line-height: 1.8;">
-      <li>Kept pushing for better — flagging edge cases, race conditions, and scenarios it hadn't thought through</li>
-      <li>Pulled it back when it went off the rails or got the wrong idea about what to build</li>
-      <li>Pushed for names that read like plain English and match the business logic: <code>SingleFlight</code> &rarr; <code>LockAndFetchRate</code>, <code>permit!</code> &rarr; <code>consume_quota!</code></li>
-      <li>Ran 1,001 live upstream calls because I didn't trust the agent's error classification — found that a missing <code>rate</code> field has nothing to do with quota exhaustion; fixed 3 exception types as a result</li>
-      <li>Caught a Redis bug the agent missed: calling <code>refund_quota!</code> before the key exists creates a negative counter with no TTL, which breaks all future quota counts</li>
-    </ul>
-    <p style="font-size: 0.85rem; color: #94a3b8; margin: 6px 0 10px;">Review the final outcome</p>
-    <ul style="margin: 0 0 0 16px; font-size: 0.92rem; line-height: 1.8;">
-      <li>Reviewed every diff line by line — accepted, rejected, or sent back for revision</li>
-      <li>Every technical and trade-off decision was mine — the agent laid out options, I made the call: layer ordering, lock scope, batch vs single fetch, failure modes, HTTP status codes</li>
-      <li>Caught a key bug in <code>LockAndFetchRate</code>: the agent used the same key for both the lock and the cache, so followers looked up the wrong key and got nothing back — split into separate <code>lock_key</code> and <code>cache_key</code></li>
-      <li>Removed unused methods the agent added "for future use" — kept the codebase focused on solving the actual problem, not hypothetical ones</li>
-      <li>Rejected a single giant commit; required 3 focused commits instead, each with one clear purpose</li>
-    </ul>
-  </div>
-  <div class="card green">
-    <h4 style="color: #10b981;">Agent Role — Code, Tests &amp; Docs</h4>
-    <p style="font-size: 0.92rem; color: #94a3b8; margin: 8px 0 12px;">Given clear direction, the agent works autonomously and produces output ready for review.</p>
-    <ul style="margin: 0 0 0 16px; font-size: 0.92rem; line-height: 1.8;">
-      <li><b>Code</b> — implemented each layer from my specs; I reviewed every change and decided what to keep</li>
-      <li><b>Tests</b> — built out the test structure on its own; I checked scenario coverage and edge cases</li>
-      <li><b>Trade-off analysis</b> — laid out implementation options with pros/cons; I made the call based on project constraints</li>
-      <li><b>Documentation</b> — drafted comments and docs; I finalized for accuracy and conciseness</li>
-      <li><b>Workflow</b> — handled git commits, environment setup, test runs, and API testing autonomously</li>
-    </ul>
-  </div>
-</div>
-</section>
 
 <!-- ==================== Footer ==================== -->
 <div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid #1e293b; text-align: center; color: #475569; font-size: 0.9rem;">
-  Inference Cache Gateway — Case Study by Dane Wu
+  Inference Cache Gateway — Dane Wu 案例研究
 </div>
 
 <script>
 const sectionLabels = {
-  challenge: 'Challenge',
-  funnel: 'Solution',
-  architecture: 'Architecture',
-  quickstart: 'Quick Start',
+  challenge: '問題背景',
+  funnel: '解決方案',
+  architecture: '系統架構',
   cache: 'RateCache',
   lock: 'LockAndFetchRate',
   quota: 'QuotaGuard',
   batch: 'Batch Fetch',
-  flow: 'Request Flow',
-  decisions: 'Decisions',
-  nongoals: 'Non-Goals',
-  failures: 'Failure Modes',
-  upstream: 'API Findings',
-  verified: 'Load & Chaos Tests',
-  files: 'File Inventory',
-  'ai-usage': 'Agent-First Workflow'
+  flow: '請求流程',
+  decisions: '設計決策',
+  failures: '故障情境',
+  upstream: 'API 觀察',
+  verified: '壓力與混沌測試'
 };
 const sections = Object.keys(sectionLabels);
 const navLinks = document.querySelectorAll('#nav a');
@@ -1401,7 +1228,7 @@ function setActive(current) {
     else { a.classList.remove('active'); a.classList.remove('idle'); }
   });
   if (!hasScrolled) { hasScrolled = true; hint.classList.add('scrolled'); }
-  hint.innerHTML = 'Current section: <span style="color:#38bdf8; font-weight:600;">' + sectionLabels[current] + '</span>';
+  hint.innerHTML = '目前區塊：<span style="color:#38bdf8; font-weight:600;">' + sectionLabels[current] + '</span>';
 }
 function updateActiveSection() {
   // Threshold must be >= section's scroll-margin-top (240px in CSS) so that
