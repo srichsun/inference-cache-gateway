@@ -1,0 +1,33 @@
+services:
+  rate-api:
+    # Mock of the expensive pricing-inference upstream used in this case study.
+    image: danewu/rate-api-mock
+    ports:
+      - "8080:8080"
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/rails
+    env_file:
+      - .env
+    environment:
+      - RATE_API_URL=http://rate-api:8080
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL_TEST=redis://redis:6379/1
+    depends_on:
+      - rate-api
+      - redis
+
+volumes:
+  redis_data:
