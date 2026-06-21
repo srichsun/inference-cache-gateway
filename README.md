@@ -1,6 +1,8 @@
 # Inference Cache Gateway
 
 > A Case Study in Caching & Quota Design — by **Dane Wu**
+>
+> _An application-layer cache gateway that minimizes real calls to an inference API under a hard request budget._
 
 ---
 
